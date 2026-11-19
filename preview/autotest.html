@@ -1,0 +1,227 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>序时 · 交互自检</title>
+<style>body{font:12px/1.6 ui-monospace,monospace;margin:0;padding:12px;background:#111;color:#ddd}
+pre{white-space:pre-wrap}.ok{color:#4ade80}.bad{color:#f87171}iframe{display:none}</style>
+</head>
+<body>
+<iframe id="f" src="../index.html?theme=light#today"></iframe>
+<pre id="out">running…</pre>
+<script>
+const f = document.getElementById('f'), out = document.getElementById('out');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const results = [];
+const check = (name, cond, extra) => results.push({ name, pass: !!cond, extra: extra === undefined ? '' : String(extra) });
+
+f.onload = async () => {
+  const w = f.contentWindow, d = f.contentDocument;
+  const q = (s) => d.querySelector(s);
+  const click = async (s, ms) => { const el = q(s); if (!el) return false; el.click(); await sleep(ms || 160); return true; };
+
+  try {
+    await sleep(700);
+    check('页面渲染', w.document.querySelectorAll('#view .page').length === 1);
+    check('tabbar 6 项', w.document.querySelectorAll('#tabbar button').length === 6);
+
+    /* 1. 五页切换 */
+    for (const p of ['calendar', 'ai', 'links', 'me', 'maint', 'today']) {
+      await click(`[data-act="go"][data-page="${p}"]`, 200);
+      check('切页 ' + p, q('#view').getAttribute('data-page') === p, q('#view').getAttribute('data-page'));
+    }
+
+    /* 2. 勾选今天第一条 */
+    const beforeEv = w.S.events.length;
+    const ck = q('.tl-row .check');
+    if (ck) { ck.click(); await sleep(200); }
+    check('勾选状态翻转', w.S.events.concat(w.S.todos).some((x) => x.done) || false);
+
+    /* 3. 新建日程并保存 */
+    await click('[data-act="newEvent"]', 250);
+    check('新建表单弹出', !!q('#itemForm'));
+    if (q('#itemForm')) {
+      q('#itemForm [name=title]').value = '自检-电路实验报告';
+      q('#itemForm [name=start]').value = '14:30';
+      q('#itemForm [name=place]').value = '品学楼 A203';
+      q('#itemForm').requestSubmit();
+      await sleep(300);
+    }
+    check('日程写入', w.S.events.some((e) => e.title === '自检-电路实验报告'), '总数 ' + w.S.events.length + ' 原 ' + beforeEv);
+
+    /* 4. 点开条目 → 编辑删除按钮存在 */
+    await click('.tl-row .ev', 250);
+    check('详情抽屉打开', !!q('#itemForm'));
+    check('编辑有删除按钮', !!(q('#itemForm') && q('[data-act="delItem"]')));
+    await click('[data-act="closeSheet"]', 250);
+
+    /* 5. 快捷录入（本地解析，不依赖网络） */
+    const r1 = w.AI.localParse('明天下午3点 交电路实验报告');
+    check('本地解析-日程', r1.events.length === 1 && r1.events[0].start === '15:00', JSON.stringify(r1.events[0] || {}));
+    check('本地解析-日期=明天', r1.events[0] && r1.events[0].date === w.U.addDays(w.U.today(), 1), r1.events[0] && r1.events[0].date);
+    const r2 = w.AI.localParse('周五前交大学物理实验预习报告');
+    check('本地解析-无时间→待办', r2.todos.length === 1 && !r2.events.length, JSON.stringify(r2.todos[0] || {}));
+    const r3 = w.AI.localParse('周三晚上七点 组会 带电脑');
+    check('本地解析-晚上七点', r3.events[0] && r3.events[0].start === '19:00', r3.events[0] && r3.events[0].start);
+
+    /* 6. 草稿入库 */
+    const n0 = w.S.events.length + w.S.todos.length;
+    w.Store.commit({ events: [{ title: '自检-草稿', date: w.U.today(), start: '09:00' }], todos: [{ title: '自检-待办' }], inbox: [] });
+    check('草稿入库', w.S.events.length + w.S.todos.length === n0 + 2);
+
+    /* 7. 入口增删 */
+    await click('[data-act="go"][data-page="links"]', 220);
+    const nl = w.S.links.length;
+    await click('[data-act="linkEdit"]', 250);
+    check('入口表单', !!q('#linkForm'));
+    if (q('#linkForm')) {
+      q('#linkForm [name=title]').value = '自检入口';
+      q('#linkForm [name=url]').value = 'example.com';
+      q('#linkForm').requestSubmit();
+      await sleep(300);
+    }
+    const added = w.S.links.find((l) => l.title === '自检入口');
+    check('入口写入+补协议', !!added && added.url === 'https://example.com', added && added.url);
+
+    /* 7.1 批量导入 */
+    const nb = w.S.links.length;
+    await click('[data-act="linkBulk"]', 250);
+    if (q('#bulkForm')) {
+      q('#bulkForm [name=bulk]').value = '自习室  https://eams.uestc.edu.cn\nhttps://www.zhihu.com';
+      q('#bulkForm').requestSubmit();
+      await sleep(300);
+    }
+    check('批量导入 2 条', w.S.links.length === nb + 2, '增加到 ' + w.S.links.length);
+
+    /* 8. 课表周次逻辑 */
+    check('单周课 第3周', w.Store.weeksInclude('1-16单', 3) === true);
+    check('单周课 第4周', w.Store.weeksInclude('1-16单', 4) === false);
+    check('双周课 第4周', w.Store.weeksInclude('2-16双', 4) === true);
+    check('区间 第9周', w.Store.weeksInclude('1-8,10-16', 9) === false);
+
+    /* 9. 课程 → 当日条目 */
+    w.S.courses.push({ id: 't1', name: '自检-高数', day: 1, periods: [1, 2], weeks: '1-20', place: '品学A101' });
+    const mon = w.U.mondayOf(w.U.today());
+    check('课程渲染到周一', w.Store.coursesOn(mon).some((c) => c.title === '自检-高数'), JSON.stringify(w.Store.coursesOn(mon).map((c) => c.title)));
+    check('课程时间取自节次表', (w.Store.coursesOn(mon)[0] || {}).start === '08:30', (w.Store.coursesOn(mon)[0] || {}).start);
+
+    /* 10. ICS 导出 */
+    const ics = w.Store.buildICS(w.U.today(), 7);
+    check('ICS 结构', ics.indexOf('BEGIN:VCALENDAR') >= 0 && ics.indexOf('BEGIN:VEVENT') >= 0 && ics.indexOf('END:VALARM') >= 0, (ics.match(/BEGIN:VEVENT/g) || []).length + ' 个事件');
+
+    /* 11. 主题切换（在维护页） */
+    await click('[data-act="go"][data-page="maint"]', 240);
+    await click('[data-act="theme"][data-t="dark"]', 300);
+    check('深色生效', d.documentElement.getAttribute('data-theme') === 'dark');
+    await click('[data-act="theme"][data-t="light"]', 300);
+    check('浅色生效', d.documentElement.getAttribute('data-theme') === 'light');
+    check('维护页有数据入口', !!q('[data-act="exportJSON"]') && !!q('[data-act="errLog"]'));
+    await click('[data-act="go"][data-page="me"]', 240);
+
+    /* 12. 设置面板 */
+    await click('[data-act="openAI"]', 250);
+    check('AI 设置面板', !!q('[name="apiKey"]') && !!q('[name="proxyBase"]'));
+    if (q('[name="apiKey"]')) {
+      q('[name="apiKey"]').value = 'sk-test-123';
+      q('[data-act="saveAI"]').click();
+      await sleep(250);
+    }
+    check('Key 保存', w.S.settings.apiKey === 'sk-test-123');
+    check('抽屉已关闭', !q('#sheet.on'));
+
+    /* 12.5 目标 */
+    const ng = w.S.goals.length;
+    await click('[data-act="goalAdd"]', 250);
+    check('目标表单', !!q('#goalForm'));
+    if (q('#goalForm')) {
+      q('#goalForm [name=title]').value = '自检-拿下数学建模校赛';
+      q('#goalForm').requestSubmit();
+      await sleep(280);
+    }
+    check('目标写入', w.S.goals.length === ng + 1, '总数 ' + w.S.goals.length);
+    const gt = q('[data-act="goalToggle"]');
+    if (gt) { gt.click(); await sleep(220); }
+    check('目标勾选', w.S.goals.some((g) => g.done));
+
+    /* 13. 空态与 XSS 转义 */
+    const esc = w.U.esc('<img src=x onerror=alert(1)>');
+    check('HTML 转义', esc.indexOf('<') < 0 && esc.indexOf('&lt;') === 0, esc);
+
+    /* 14. 图片压缩（1x1 PNG 走 canvas） */
+    const png = await fetch('../icons/icon-192.png').then((x) => x.blob());
+    const c = await w.Store.compress(new File([png], 'a.png', { type: 'image/png' }), 240, 0.7);
+    check('图片压缩', /^data:image\/jpeg/.test(c.data) && c.w <= 240, c.w + 'x' + c.h + ' ' + Math.round(c.data.length / 1024) + 'KB');
+
+    /* 15. DDL */
+    await click('[data-act="go"][data-page="today"]', 240);
+    check('今天页有 DDL 卡', !!q('.ddl-row'), q('.ddl-row') ? q('.ddl-badge').textContent : '');
+    check('DDL 文案是 D-n / 已过期', /D-\d|过期|小时/.test((q('.ddl-badge') || {}).textContent || ''), (q('.ddl-badge') || {}).textContent);
+    await click('[data-act="ddlSheet"]', 260);
+    check('DDL 管理面板', !!q('[data-act="ddlAdd"]'));
+    await click('[data-act="ddlAdd"]', 260);
+    check('DDL 表单', !!q('#ddlForm'));
+    const nd = w.S.ddls.length;
+    if (q('#ddlForm')) {
+      q('#ddlForm [name=title]').value = '自检-大物实验报告';
+      q('#ddlForm [name=date]').value = w.U.addDays(w.U.today(), 10);
+      q('#ddlForm [name=time]').value = '23:59';
+      q('#ddlForm').requestSubmit();
+      await sleep(300);
+    }
+    check('DDL 写入', w.S.ddls.length === nd + 1, '总数 ' + w.S.ddls.length);
+    const dl = w.Store.ddlsOpen();
+    check('DDL 按时间升序', dl.length > 1 ? dl[0].dueMs <= dl[1].dueMs : true);
+    check('DDL 标签分级', (function () {
+      const soon = w.Store.ddlLabel(Date.now() + 2 * 86400000);
+      const past = w.Store.ddlLabel(Date.now() - 3 * 86400000);
+      return soon.text === 'D-2' && soon.level === 'soon' && past.level === 'past';
+    })(), JSON.stringify(w.Store.ddlLabel(Date.now() + 2 * 86400000)));
+    check('ICS 含 DDL', w.Store.buildICS(w.U.today(), 7).indexOf('UID:ddl-') > 0);
+
+    /* 16. GPA */
+    check('绩点-分段 90', w.Store.gpaPoint(90, 'level') === 4, w.Store.gpaPoint(90, 'level'));
+    check('绩点-分段 88', w.Store.gpaPoint(88, 'level') === 3.7, w.Store.gpaPoint(88, 'level'));
+    check('绩点-线性 88', Math.abs(w.Store.gpaPoint(88, 'linear') - 3.8) < 1e-6, w.Store.gpaPoint(88, 'linear'));
+    check('绩点-不及格', w.Store.gpaPoint(55, 'level') === 0);
+    w.S.grades.push({ id: 'g1', name: '自检-高数', credit: 4, score: 90, type: '必修' });
+    w.S.grades.push({ id: 'g2', name: '自检-英语', credit: 2, score: 80, type: '必修' });
+    const gg = w.Store.gpa();
+    check('加权 GPA (4*4+2*3)/6', Math.abs(gg.gpa - 22 / 6) < 1e-6, gg.gpa.toFixed(3));
+    check('学分统计', gg.credits === 6, gg.credits);
+    await click('[data-act="go"][data-page="me"]', 260);
+    check('我的页 GPA 卡', !!q('.gpa-big'), q('.gpa-big') ? q('.gpa-big').textContent : '');
+    await click('[data-act="gradeSheet"]', 300);
+    check('GPA 面板', !!q('#targetGpaInput') && !!q('[data-act="gradeAdd"]'));
+
+    /* 17. 番茄钟 */
+    const f0 = w.Store.focusState();
+    check('初始无专注', !f0.running && f0.remain === 0);
+    w.Store.focusStart(25, '自检专注');
+    const f1 = w.Store.focusState();
+    check('专注开始', f1.running === true && f1.minutes === 25 && f1.remain > 24 * 60000, Math.round(f1.remain / 1000) + 's');
+    w.Store.focusPause();
+    const f2 = w.Store.focusState();
+    check('专注暂停', f2.running === false && f2.remain > 0);
+    w.Store.focusResume();
+    check('专注继续', w.Store.focusState().running === true);
+    const nf = w.S.focus.length;
+    w.Store.focusStop(true);
+    check('专注计入记录', w.S.focus.length === nf + 1 && w.Store.focusToday() >= 25, w.Store.focusToday() + ' 分钟');
+    check('专注状态清空', !w.Store.focusState().running && !w.S.focusState);
+
+    /* 18. 数据完整性 */
+    check('新字段都落盘', ['ddls', 'grades', 'reviews', 'focus'].every((k) => Array.isArray(w.S[k])),
+      ['ddls', 'grades', 'reviews', 'focus'].map((k) => k + ':' + (Array.isArray(w.S[k]) ? w.S[k].length : 'X')).join(' '));
+
+    check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));
+  } catch (e) {
+    check('测试脚本异常', false, e.message + ' @ ' + (e.stack || '').split('\n')[1]);
+  }
+
+  /* 清理测试数据 */
+  try { w.localStorage.clear(); } catch (e) {}
+
+  const bad = results.filter((r) => !r.pass);
+  out.innerHTML = `<b class="${bad.length ? 'bad' : 'ok'}">${results.length - bad.length}/${results.length} 通过</b>\n\n` +
+    results.map((r) => `${r.pass ? '✅' : '❌'} ${r.name}${r.extra ? '  —  ' + r.extra : ''}`).join('\n');
+  document.title = '自检 ' + (results.length - bad.length) + '/' + results.length;
+};
+</script>
+</body></html>

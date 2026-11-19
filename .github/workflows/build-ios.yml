@@ -1,0 +1,80 @@
+name: 打包 iOS（未签名 .ipa）
+
+# 用法：仓库 → Actions → 选这个 workflow → Run workflow
+# 跑完在页面底部下载 artifact：Xushi-unsigned-ipa
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/build-ios.yml'
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: 取代码
+        uses: actions/checkout@v4
+
+      - name: 装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 装依赖
+        working-directory: native
+        run: npm ci || npm install
+
+      - name: 把最新的网页资源同步进 native/www
+        run: |
+          rm -rf native/www
+          mkdir -p native/www
+          cp index.html native/www/
+          cp manifest.webmanifest sw.js install.html native/www/
+          cp -r css js icons native/www/
+          ls -la native/www
+
+      - name: 同步 web 资源 + CocoaPods
+        working-directory: native
+        run: |
+          npx cap sync ios
+          cd ios/App && pod install --repo-update
+
+      - name: 编译（不签名）
+        working-directory: native
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -quiet \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            EXPANDED_CODE_SIGN_IDENTITY=""
+
+      - name: 打成 .ipa
+        run: |
+          set -e
+          APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          ls -la "$RUNNER_TEMP/App.xcarchive/Products/Applications/"
+          rm -rf "$RUNNER_TEMP/Payload"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qry Xushi-unsigned.ipa Payload
+          ls -lh Xushi-unsigned.ipa
+
+      - name: 上传
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xushi-unsigned-ipa
+          path: ${{ runner.temp }}/Xushi-unsigned.ipa
+          retention-days: 30

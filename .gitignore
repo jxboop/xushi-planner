@@ -1,0 +1,11 @@
+node_modules/
+native/node_modules/
+native/www/
+native/ios/App/Pods/
+native/ios/App/App/public/
+native/ios/App/App.xcodeproj/xcuserdata/
+native/ios/App/App.xcworkspace/xcuserdata/
+*.ipa
+*.xcarchive
+.DS_Store
+Thumbs.db

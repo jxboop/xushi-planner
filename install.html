@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>安装「序时」</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F3F4F7">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#F3F4F7; --card:#fff; --line:rgba(17,24,39,.08); --text:#0F172A; --text2:#5B6472; --text3:#98A1AE;
+    --accent:#3B6CFF; --accent2:#8B5CF6; --ok:#10B981;
+    --shadow:0 1px 1px rgba(16,24,40,.03),0 12px 30px -20px rgba(16,24,40,.45);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0A0B0F;--card:#171920;--line:rgba(255,255,255,.09);--text:#F2F4F8;--text2:#9AA3B2;--text3:#6C7482;--accent:#6E93FF;--accent2:#A78BFA}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;padding:calc(28px + env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",system-ui,sans-serif;
+    font-size:15px;line-height:1.55;letter-spacing:-.01em;max-width:520px;margin:0 auto;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mark{
+    width:66px;height:66px;border-radius:20px;display:grid;place-content:center;font-size:26px;font-weight:600;color:#fff;
+    background:linear-gradient(135deg,#4F7BFF,#8B5CF6);box-shadow:0 16px 36px -16px rgba(59,108,255,.8);margin-bottom:16px;
+  }
+  h1{font-size:27px;letter-spacing:-.035em;margin:0 0 6px;font-weight:700}
+  .lead{color:var(--text2);font-size:14px;margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:17px;box-shadow:var(--shadow);margin-bottom:14px}
+  .card h2{font-size:16px;margin:0 0 4px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,108,255,.12);color:var(--accent)}
+  .card p{color:var(--text2);font-size:13.5px;margin:0 0 12px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin:11px 2px 6px}
+  input{
+    width:100%;height:46px;padding:0 13px;border-radius:13px;border:1px solid var(--line);
+    background:var(--bg);color:var(--text);font-size:15px;outline:none;font-family:inherit;
+  }
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3.5px rgba(59,108,255,.12)}
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:50px;margin-top:14px;
+    border:0;border-radius:15px;font-size:15px;font-weight:600;color:#fff;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 12px 26px -14px rgba(59,108,255,.9);
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--line);box-shadow:none;font-weight:500}
+  .btn svg{width:17px;height:17px}
+  ol{margin:8px 0 0;padding-left:20px;color:var(--text2);font-size:13.5px}
+  ol li{margin:7px 0}
+  ol b{color:var(--text);font-weight:600}
+  .hint{font-size:12px;color:var(--text3);margin-top:10px;line-height:1.6}
+  .tip{background:rgba(59,108,255,.07);border:1px solid rgba(59,108,255,.16);border-radius:14px;padding:12px 14px;font-size:13px;color:var(--text2);line-height:1.6}
+  .tip b{color:var(--text)}
+  .prev{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px;border-radius:16px;background:var(--bg);border:1px solid var(--line)}
+  .prev img{width:44px;height:44px;border-radius:12px;display:block}
+  .prev .nm{font-size:14.5px;font-weight:600}
+  .prev .sm{font-size:11.5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px}
+  .foot{text-align:center;color:var(--text3);font-size:11.5px;margin-top:24px;line-height:1.8}
+  .ok{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="mark">序</div>
+<h1>把「序时」装到手机上</h1>
+<p class="lead">两种方式，任选一种。方式一更像「安装包」，方式二更简单。</p>
+
+<div class="card">
+  <h2>方式一 · 安装包 <span class="badge">.mobileconfig</span></h2>
+  <p>下载一个配置描述文件，装完桌面上直接出现 App 图标，点开全屏运行，和下载的 App 手感一样。</p>
+
+  <label>App 网址（你部署后的地址）</label>
+  <input id="appUrl" inputmode="url" spellcheck="false" placeholder="https://xushi.pages.dev">
+  <label>桌面显示的名字</label>
+  <input id="appName" value="序时" maxlength="12">
+
+  <div class="prev">
+    <img id="prevIcon" src="icons/apple-touch-icon.png" alt="">
+    <div style="min-width:0">
+      <div class="nm" id="prevName">序时</div>
+      <div class="sm" id="prevUrl">https://…</div>
+    </div>
+  </div>
+
+  <button class="btn" id="dl">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5M7.5 12L12 16.5 16.5 12M4.5 20h15"/></svg>
+    下载安装包
+  </button>
+
+  <ol>
+    <li>点上面的按钮，Safari 会提示「此网站正尝试下载一个配置描述文件」，点 <b>允许</b></li>
+    <li>打开手机的 <b>设置</b>，最上面会出现 <b>已下载描述文件</b>，点进去</li>
+    <li>右上角 <b>安装</b> → 输入锁屏密码 → 再点一次 <b>安装</b></li>
+    <li>回到桌面，图标已经在了</li>
+  </ol>
+  <div class="hint">如果设置里没看到「已下载描述文件」：设置 → 通用 → VPN 与设备管理 → 找到「序时」→ 安装。iOS 17 / 18 都是这个路径。</div>
+</div>
+
+<div class="card">
+  <h2>方式二 · 添加到主屏幕 <span class="badge">最简单</span></h2>
+  <p>不用装任何文件，十秒钟。</p>
+  <ol>
+    <li>用 <b>Safari</b> 打开 App 网址（微信里打开的不行，要点右上角「在 Safari 中打开」）</li>
+    <li>点底部中间的 <b>分享</b> 按钮（方框带向上箭头）</li>
+    <li>往下滑，选 <b>添加到主屏幕</b> → 右上角 <b>添加</b></li>
+  </ol>
+  <div class="hint">两种方式效果几乎一样：都是全屏、无地址栏、能离线打开。区别只有——安装包会多一个描述文件（可在设置里随时删掉）。</div>
+</div>
+
+<div class="card">
+  <h2>为什么不是 .ipa</h2>
+  <p style="margin-bottom:0">iPhone 不允许从网页直接安装 App Store 以外的 .ipa：要么有 Mac + Xcode 自己签名（免费证书 7 天过期），要么买 99 美元/年的开发者账号走 TestFlight。上面两种方式是唯一不需要这些、也不用越狱就能「装到桌面」的路。</p>
+</div>
+
+<div class="tip">
+  <b>装好后第一步：</b>打开 App → 我的 → 填 DeepSeek API Key → 测试连接。然后回今天页输入一句「明天下午三点图书馆还书」，能自己排进日程就说明通了。
+</div>
+
+<div class="foot">
+  序时 · 数据只存在这台手机上<br>描述文件里只包含一个网址和一个图标，没有其它权限
+</div>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const urlEl = $('#appUrl'), nameEl = $('#appName');
+  const prevIcon = $('#prevIcon'), prevName = $('#prevName'), prevUrl = $('#prevUrl');
+
+  // 默认填当前站点根地址（在已部署的站点上打开时最省事）
+  const here = location.origin + location.pathname.replace(/[^/]*$/, '');
+  if (location.protocol.startsWith('http') && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) {
+    urlEl.value = here;
+  } else {
+    urlEl.placeholder = 'https://你的域名.pages.dev/';
+  }
+
+  function sync() {
+    prevName.textContent = nameEl.value.trim() || '序时';
+    const v = urlEl.value.trim();
+    prevUrl.textContent = v || 'https://…';
+  }
+  urlEl.addEventListener('input', sync);
+  nameEl.addEventListener('input', sync);
+  sync();
+
+  const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  }).toUpperCase();
+
+  async function iconBase64() {
+    try {
+      const res = await fetch('icons/apple-touch-icon.png', { cache: 'force-cache' });
+      const buf = new Uint8Array(await res.arrayBuffer());
+      let s = '';
+      const CH = 0x7000;
+      for (let i = 0; i < buf.length; i += CH) s += String.fromCharCode.apply(null, buf.subarray(i, i + CH));
+      return btoa(s);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function build(url, name, icon) {
+    const iconBlock = icon ? '\n        <key>Icon</key>\n        <data>' + icon + '</data>' : '';
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>FullScreen</key>
+            <true/>${iconBlock}
+            <key>IgnoreManifestScope</key>
+            <true/>
+            <key>IsRemovable</key>
+            <true/>
+            <key>Label</key>
+            <string>${esc(name)}</string>
+            <key>PayloadDescription</key>
+            <string>把「${esc(name)}」放到桌面上，全屏使用</string>
+            <key>PayloadDisplayName</key>
+            <string>${esc(name)}</string>
+            <key>PayloadIdentifier</key>
+            <string>com.xushi.webclip.${Date.now()}</string>
+            <key>PayloadType</key>
+            <string>com.apple.webClip.management</string>
+            <key>PayloadUUID</key>
+            <string>${uuid()}</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>Precomposed</key>
+            <true/>
+            <key>URL</key>
+            <string>${esc(url)}</string>
+        </dict>
+    </array>
+    <key>PayloadDescription</key>
+    <string>${esc(name)} · AI 日程</string>
+    <key>PayloadDisplayName</key>
+    <string>${esc(name)}</string>
+    <key>PayloadIdentifier</key>
+    <string>com.xushi.profile.${Date.now()}</string>
+    <key>PayloadOrganization</key>
+    <string>Xushi</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>${uuid()}</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
+`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  window.__build = build; // 方便在控制台里手动生成
+
+  $('#dl').addEventListener('click', async () => {
+    let url = urlEl.value.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    try { new URL(url); } catch (e) { alert('网址格式不对'); return; }
+    if (!/^https:/i.test(url)) { alert('iOS 的桌面网页 App 必须是 https 开头（http 装出来是空白的）'); return; }
+
+    const name = nameEl.value.trim() || '序时';
+    const btn = $('#dl');
+    btn.textContent = '正在生成…';
+    const icon = await iconBase64();
+    const xml = build(url, name, icon);
+    const blob = new Blob([xml], { type: 'application/x-apple-aspen-config' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name.replace(/[\\/:*?"<>|]/g, '') + '.mobileconfig';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6.5L9.3 17.2 4 11.9"/></svg> 已下载，去设置里安装';
+    setTimeout(() => { btn.textContent = '再下一个'; }, 3200);
+  });
+})();
+</script>
+</body>
+</html>

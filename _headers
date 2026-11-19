@@ -1,0 +1,6 @@
+/xushi.mobileconfig
+  Content-Type: application/x-apple-aspen-config
+  Content-Disposition: inline; filename="xushi.mobileconfig"
+
+/install.html
+  Cache-Control: no-store

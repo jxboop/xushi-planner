@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;padding:0;background:#0d0f14}
+iframe{width:390px;height:844px;border:0;display:block;background:#fff}</style></head>
+<body>
+<iframe id="f"></iframe>
+<script>
+const q = new URLSearchParams(location.search);
+const p = q.get('p') || 'today';
+const theme = q.get('theme') || '';
+const f = document.getElementById('f');
+if (q.get('h')) f.style.height = q.get('h') + 'px';
+f.addEventListener('load', () => {
+  if (q.get('run')) {
+    setTimeout(() => { try { f.contentWindow.eval(q.get('run')); } catch (e) { document.title = 'ERR ' + e.message; } }, 700);
+  }
+  if (!q.get('scroll')) return;
+  let n = 0;
+  const t = setInterval(() => {
+    try { f.contentDocument.querySelector('#view').scrollTop = +q.get('scroll'); } catch (e) {}
+    if (++n > 12) clearInterval(t);
+  }, 200);
+});
+f.src = '../index.html?' + (theme ? 'theme=' + theme + '&' : '') + '#' + p;
+</script>
+</body></html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>序时 · AI 日程</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="序时">
+<meta name="theme-color" content="#F5F6F8">
+<meta name="description" content="给大学生的 AI 日程与备忘录：自然语言安排、相册智能分类、快捷入口、重要消息收件箱。">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  /* 轻量错误收集：出问题时不白屏，也方便排查 */
+  window.__errs = [];
+  window.addEventListener('error', function (e) { window.__errs.push(String(e.message || e)); });
+  window.addEventListener('unhandledrejection', function (e) { window.__errs.push('reject: ' + String((e.reason && e.reason.message) || e.reason)); });
+</script>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div id="boot" class="boot">
+  <div class="boot-mark">序</div>
+  <div class="boot-txt">正在载入…</div>
+</div>
+
+<main id="view" class="view" aria-live="polite"></main>
+
+<nav id="tabbar" class="tabbar" aria-label="主导航"></nav>
+
+<div id="scrim" class="scrim" data-act="closeSheet"></div>
+<section id="sheet" class="sheet" role="dialog" aria-modal="true"></section>
+<div id="toast" class="toast"></div>
+
+<script src="js/store.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<iframe id="f" src="../install.html" style="width:400px;height:600px"></iframe>
+<pre id="out">…</pre>
+<script>
+const f=document.getElementById('f'), out=document.getElementById('out');
+f.addEventListener('load',()=>setTimeout(()=>{
+  try{
+    const w=f.contentWindow;
+    const xml=w.__build('https://xushi-demo.pages.dev','序时','iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    out.textContent = xml;
+  }catch(e){ out.textContent='ERR '+e.message }
+},1200));
+</script></body></html>

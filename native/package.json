@@ -1,0 +1,22 @@
+{
+  "name": "native",
+  "version": "1.0.0",
+  "description": "序时 · iOS 原生壳（Capacitor）",
+  "main": "index.js",
+  "scripts": {
+    "sync": "cap sync ios",
+    "open:ios": "cap open ios"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/browser": "^6.0.6",
+    "@capacitor/cli": "^6.2.3",
+    "@capacitor/core": "^6.2.3",
+    "@capacitor/filesystem": "^6.0.4",
+    "@capacitor/ios": "^6.2.3",
+    "@capacitor/share": "^6.0.4"
+  }
+}
