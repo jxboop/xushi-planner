@@ -8,6 +8,11 @@
 
   const U = window.U, S = window.S;
 
+  /** 带思考链的模型：要求更多 max_tokens，否则回答被 reasoning 吃光 */
+  function IS_REASONER(model) {
+    return /reasoner|v4(\.\d)?-flash|v4(\.\d)?-pro|r1/i.test(String(model || ''));
+  }
+
   function join(base, path) {
     let b = String(base || '').trim().replace(/\/+$/, '');
     if (!b) b = 'https://api.deepseek.com';
@@ -58,9 +63,9 @@
           max_tokens: opt.maxTokens || 2600,
           stream: false
         },
-          // deepseek-reasoner（R1）不接受 temperature / response_format
-          /reasoner/i.test(model) ? {} : { temperature: opt.temperature != null ? opt.temperature : 0.35 },
-          (opt.json && !/reasoner/i.test(model)) ? { response_format: { type: 'json_object' } } : {}
+          // 推理模型（deepseek-reasoner / v4-flash 系列）不吃 temperature，且思考会占 token
+          IS_REASONER(model) ? {} : { temperature: opt.temperature != null ? opt.temperature : 0.35 },
+          (opt.json && !IS_REASONER(model)) ? { response_format: { type: 'json_object' } } : {}
         ))
       });
     } catch (e) {
@@ -217,7 +222,7 @@
       base: s.visionBase || s.apiBase,
       key: s.visionKey || s.apiKey,
       model: s.visionModel || 'glm-4v-flash',
-      maxTokens: 2400
+      maxTokens: IS_REASONER(s.visionModel) ? 4000 : 2400
     });
     const j = pickJSON(r.text) || {};
     return normalize(j, { keepText: true });
