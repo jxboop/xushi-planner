@@ -809,3 +809,7 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
 @media (prefers-reduced-motion:reduce){
   .page.slide-right,.page.slide-left,.check.pop,.check.pop::after,.ripple{animation:none!important}
 }
+
+/* ---------- DDL 阶段进度 ---------- */
+.step-bar{height:4px;border-radius:4px;background:var(--line);margin-top:7px;overflow:hidden}
+.step-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .45s cubic-bezier(.3,.8,.3,1)}

@@ -249,6 +249,16 @@ f.onload = async () => {
     check('第19周没课', w.Store.coursesInWeek(19).length === 0, w.Store.coursesInWeek(19).length);
     check('结课周=10', w.Store.courseLastWeek({ weeks: '3-10' }) === 10, w.Store.courseLastWeek({ weeks: '3-10' }));
 
+    /* 21. DDL 阶段拆解 */
+    w.S.ddls.push({ id: 'st1', title: '阶段测试作业', date: w.U.addDays(w.U.today(), 5), tag: '作业', done: false,
+      steps: [{ id: 'a', title: '查资料', date: w.U.addDays(w.U.today(), 1), done: true },
+              { id: 'b', title: '写初稿', date: w.U.addDays(w.U.today(), 3), done: false }] });
+    w.Store.save();
+    await click('[data-act="go"][data-page="today"]', 260);
+    check('DDL 阶段进度条', !!q('.step-bar'), q('.step-bar') ? '有' : '无');
+    const ddlTxt = (q('.ddl-main') || {}).textContent || '';
+    check('显示下一步阶段', ddlTxt.indexOf('写初稿') >= 0, ddlTxt.replace(/\s+/g, ' ').slice(0, 40));
+
     check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));
   } catch (e) {
     check('测试脚本异常', false, e.message + ' @ ' + (e.stack || '').split('\n')[1]);

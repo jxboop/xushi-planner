@@ -195,10 +195,18 @@
     list.slice(0, 3).forEach((d) => {
       const lb = Store.ddlLabel(d.dueMs);
       const dt = U.toDate(d.date);
+      const steps = d.steps || [];
+      const doneN = steps.filter(function (x) { return x.done; }).length;
+      const next = steps.filter(function (x) { return !x.done; }).sort(function (a, b) { return (a.date || '9') < (b.date || '9') ? -1 : 1; })[0];
       h += '<div class="ddl-row">' +
         '<div class="ddl-badge ' + lb.level + '">' + lb.text + '</div>' +
         '<div class="ddl-main" data-act="ddlOpen" data-id="' + d.id + '"><b>' + U.esc(d.title) + '</b>' +
-        '<small>' + (dt.getMonth() + 1) + ' 月 ' + dt.getDate() + ' 日' + (d.time ? ' ' + d.time : '') + (d.tag ? ' · ' + U.esc(d.tag) : '') + '</small></div>' +
+        '<small>' + (dt.getMonth() + 1) + ' 月 ' + dt.getDate() + ' 日' + (d.time ? ' ' + d.time : '') + (d.tag ? ' · ' + U.esc(d.tag) : '') + '</small>' +
+        (steps.length ? '<div class="step-bar"><i style="width:' + Math.round(doneN / steps.length * 100) + '%"></i></div>' +
+          '<div class="tiny" style="color:var(--text-3);margin-top:3px">' + (next
+            ? '下一步：' + U.esc(next.title) + (next.date ? '（' + (U.toDate(next.date).getMonth() + 1) + '/' + U.toDate(next.date).getDate() + '）' : '')
+            : '阶段都做完了') + '</div>' : '') +
+        '</div>' +
         '<button class="check" data-act="ddlDone" data-id="' + d.id + '">' + ICON.check + '</button></div>';
     });
     h += '</div>';
@@ -985,6 +993,8 @@
       '<div class="field" style="flex:1"><label>时间（可空）</label><input type="time" name="time" value="' + U.esc(d.time || '') + '"></div></div>';
     h += '<div class="field"><label>标签</label><select name="tag"><option value="">不标</option>' + TAGS.map((t) => '<option' + (d.tag === t ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>';
     h += '<div class="field"><label>备注</label><textarea name="note" placeholder="提交到哪里、要带什么">' + U.esc(d.note || '') + '</textarea></div>';
+    const stepTxt = (d.steps || []).map(function (x) { return (x.date ? x.date.slice(5) + ' ' : '') + x.title; }).join(String.fromCharCode(10));
+    h += '<div class="field"><label>阶段计划（可选）</label><textarea name="steps" placeholder="11-25 查资料' + String.fromCharCode(10) + '11-28 写完初稿' + String.fromCharCode(10) + '12-01 润色交稿" style="min-height:92px;font-size:14px">' + U.esc(stepTxt) + '</textarea><div class="hint">一行一个：「月-日 做什么」。大作业拆三段，每段有自己的日子，首页会提醒你下一步。</div></div>';
     h += '<div class="btn-row sticky-actions"><button class="btn primary" type="submit">保存</button></div>';
     if (id) h += '<button class="btn block ghost danger" type="button" style="margin-top:10px" data-act="ddlDel" data-id="' + id + '">删除</button>';
     h += '</form>';
@@ -1659,7 +1669,25 @@
       case 'semForm': S.settings.semesterStart = get('semesterStart'); Store.save(); closeSheet(); toast('已保存'); render(true); break;
       case 'ddlForm': {
         const did = f.getAttribute('data-id');
-        const patch = { title: get('title') || '未命名', date: get('date') || U.today(), time: get('time'), note: get('note'), tag: get('tag') };
+        const oldD = did ? S.ddls.find((x) => x.id === did) : null;
+        const yr = (get('date') || U.today()).slice(0, 4);
+        const steps = get('steps').split(String.fromCharCode(10)).map(function (line) {
+          const t = line.trim();
+          if (!t) return null;
+          const m = t.match(/^(\d{1,2})[-\/.月](\d{1,2})[日\s]*(.*)$/);
+          if (m) {
+            return { id: U.uid(), title: (m[3] || '阶段').trim(), date: yr + '-' + U.pad(+m[1]) + '-' + U.pad(+m[2]), done: false };
+          }
+          return { id: U.uid(), title: t, date: '', done: false };
+        }).filter(Boolean);
+        // 保留已有阶段完成状态
+        if (oldD && oldD.steps) {
+          steps.forEach(function (st) {
+            const oldStep = oldD.steps.find(function (o) { return o.title === st.title && o.date === st.date; });
+            if (oldStep) st.done = !!oldStep.done;
+          });
+        }
+        const patch = { title: get('title') || '未命名', date: get('date') || U.today(), time: get('time'), note: get('note'), tag: get('tag'), steps: steps };
         if (did) {
           const d = S.ddls.find((x) => x.id === did);
           if (d) Object.assign(d, patch);
