@@ -1138,6 +1138,15 @@
       case 'courseImport': sheetCourse(); break;
       case 'courseParse': runCourseParse(); break;
       case 'courseSave': saveCourses(); break;
+      case 'courseDirect': {
+        const t = document.getElementById('courseText');
+        const list = Store.parseTimetableLines(t ? t.value : '');
+        if (!list.length) { toast('没认出来，检查格式：课程名|周一|1-2|教室|4-19'); break; }
+        courseDraft = list;
+        showCoursePreview(list, []);
+        toast('认出 ' + list.length + ' 条，点确认导入');
+        break;
+      }
       case 'courseDrop': {
         const i = +el.getAttribute('data-i');
         if (courseDraft) {
@@ -1576,7 +1585,8 @@
     let h = '<h2>导入课程表</h2><p class="sh-sub">从教务系统复制课表文本粘贴进来，AI 会拆成「周几 + 第几节 + 周次」。</p>';
     h += '<div class="field"><textarea id="courseText" placeholder="高等数学A  周一 1-2节 品学A101 王老师 1-16周&#10;大学物理    周三 3-4节 立人楼B203  1-16周&#10;电路分析    周五 5-6节 主楼C302   2-16双" style="min-height:150px"></textarea></div>';
     h += '<div class="field"><label>学期第 1 周周一</label><input type="date" id="courseSem" value="' + U.esc(S.settings.semesterStart || '') + '"></div>';
-    h += '<div class="btn-row"><button class="btn primary" data-act="courseParse">AI 解析</button><button class="btn" data-act="courseSave">直接保存草稿</button></div>';
+    h += '<div class="btn-row"><button class="btn primary" data-act="courseParse">AI 解析</button><button class="btn" data-act="courseDirect">直接导入</button></div>';
+    h += '<div class="hint" style="margin:8px 2px 0;line-height:1.6">「直接导入」不花 AI，认这种一行一条的格式：<br><code style="font-size:11.5px">微积分Ⅰ|周一|1-2|品学楼A303|4-19</code><br>（课程名 | 周几 | 第几节 | 教室 | 周次）</div>';
     h += '<div id="coursePreview"></div>';
     openSheet(h);
   }

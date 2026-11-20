@@ -571,6 +571,44 @@
       .reduce((a, b) => a + (b.minutes || 0), 0);
   }
 
+  /* ---------------- 粘贴课表文本（不花 AI 的本地解析） ----------------
+     格式：课程名|周一|1-2|教室|周次[|教师]
+     竖线、制表符、连续空格都能分隔
+  ------------------------------------------------------------ */
+  const DAY_MAP = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 7, 天: 7 };
+
+  function parseTimetableLines(text) {
+    const out = [];
+    String(text || '').split(String.fromCharCode(10)).forEach(function (line) {
+      const raw = line.trim();
+      if (!raw || /^[#/\-]/.test(raw)) return;
+      const parts = raw.split(/[|｜	]+|\s{2,}/).map(function (x) { return String(x).trim(); }).filter(Boolean);
+      if (parts.length < 4) return;
+
+      const name = parts[0].replace(/[（(][^)）]*[)）]$/, '').trim() || parts[0];
+      const dm = parts[1].match(/[周星期礼拜]([一二三四五六日天])/);
+      const day = dm ? DAY_MAP[dm[1]] : 0;
+      if (!day) return;
+
+      const pm = parts[2].match(/(\d{1,2})\s*[-–~到至]\s*(\d{1,2})/) || parts[2].match(/(\d{1,2})/);
+      if (!pm) return;
+      const a = parseInt(pm[1], 10);
+      const b = pm[2] ? parseInt(pm[2], 10) : a;
+      const periods = [];
+      for (let i = a; i <= b && i <= 20; i++) periods.push(i);
+
+      out.push({
+        name: name.slice(0, 40),
+        teacher: (parts[5] || '').slice(0, 20),
+        place: (parts[3] || '').slice(0, 30),
+        day: day,
+        periods: periods,
+        weeks: parts[4] || '1-16'
+      });
+    });
+    return out;
+  }
+
   /* ---------------- 统计 ---------------- */
   function stats() {
     const t = U.today();
@@ -591,7 +629,7 @@
     coursesOn, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
     addEvent: Api.addEvent, addTodo: Api.addTodo, delItem: Api.delItem,
     toggleItem: Api.toggleItem, commit: Api.commit,
-    buildICS, compress, stats,
+    buildICS, compress, stats, parseTimetableLines,
     gpaPoint, gpa,
     ddlDue, ddlsOpen, ddlLabel,
     focusState, focusStart, focusPause, focusResume, focusStop, focusToday,
