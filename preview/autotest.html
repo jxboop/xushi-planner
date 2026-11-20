@@ -232,6 +232,22 @@ f.onload = async () => {
     check('开关可切换', w.S.settings.reasoning === false);
     await click('[data-act="closeSheet"]', 200);
 
+    /* 20. 按周过滤课程（纯数据校验，不点 UI） */
+    w.S.settings.semesterStart = w.U.addDays(w.U.mondayOf(w.U.today()), -70);
+    w.S.courses = [
+      { id: 'w1', name: '已结课测试', day: 1, periods: [1, 2], weeks: '3-10' },
+      { id: 'w2', name: '进行中测试', day: 1, periods: [3, 4], weeks: '3-18' }
+    ];
+    const wNo = w.Store.weekNo(w.U.today());
+    check('算出当前周次=11', wNo === 11, wNo);
+    const monW = w.U.mondayOf(w.U.today());
+    check('已结课不显示', !w.Store.coursesOn(monW).some((c) => c.title === '已结课测试'));
+    check('进行中显示', w.Store.coursesOn(monW).some((c) => c.title === '进行中测试'));
+    check('第3周两门都在', w.Store.coursesInWeek(3).length === 2, w.Store.coursesInWeek(3).length);
+    check('第11周只剩一门', w.Store.coursesInWeek(11).length === 1, w.Store.coursesInWeek(11).length);
+    check('第19周没课', w.Store.coursesInWeek(19).length === 0, w.Store.coursesInWeek(19).length);
+    check('结课周=10', w.Store.courseLastWeek({ weeks: '3-10' }) === 10, w.Store.courseLastWeek({ weeks: '3-10' }));
+
     check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));
   } catch (e) {
     check('测试脚本异常', false, e.message + ' @ ' + (e.stack || '').split('\n')[1]);

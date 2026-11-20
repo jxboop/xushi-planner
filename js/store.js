@@ -296,6 +296,39 @@
     });
   }
 
+  /** 某一周的全部课程（已按周次过滤），按 星期 → 节次 排好 */
+  function coursesInWeek(w) {
+    return S.courses
+      .filter(function (c) { return weeksInclude(c.weeks, w); })
+      .map(function (c) {
+        const sp = (c.start && c.end) ? { start: c.start, end: c.end } : periodSpan(c.periods);
+        const p = (c.periods || []).slice().sort(function (a, b) { return a - b; });
+        return {
+          id: c.id, name: c.name, teacher: c.teacher || '', place: c.place || '',
+          day: Number(c.day), periods: p, weeks: c.weeks || '',
+          start: sp.start, end: sp.end,
+          periodText: p.length ? (p.length > 1 ? p[0] + '-' + p[p.length - 1] : '' + p[0]) + ' 节' : ''
+        };
+      })
+      .sort(function (a, b) {
+        if (a.day !== b.day) return a.day - b.day;
+        return (U.mins(a.start) || 0) - (U.mins(b.start) || 0);
+      });
+  }
+
+  /** 课程在第几周结束（用于标「已结课」） */
+  function courseLastWeek(c) {
+    const spec = String(c.weeks || '').replace(/[^0-9,，、\-]/g, '');
+    if (!spec) return 99;
+    let max = 0;
+    spec.split(/[,，、]+/).forEach(function (p) {
+      const m = p.split('-');
+      const b = parseInt(m[m.length - 1], 10);
+      if (b > max) max = b;
+    });
+    return max || 99;
+  }
+
   /* ---------------- 当天全部条目 ---------------- */
   function eventsOn(dayStr) {
     return S.events.filter((e) => e.date === dayStr).map((e) => Object.assign({ kind: 'event' }, e));
@@ -626,7 +659,7 @@
   window.S = S;
   window.Store = {
     save, seed, DEFAULT_SETTINGS, DEFAULT_PERIODS,
-    coursesOn, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
+    coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
     addEvent: Api.addEvent, addTodo: Api.addTodo, delItem: Api.delItem,
     toggleItem: Api.toggleItem, commit: Api.commit,
     buildICS, compress, stats, parseTimetableLines,

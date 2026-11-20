@@ -85,6 +85,8 @@
     page: 'today',
     sel: U.today(),
     calBase: U.today(),
+    calMode: 'month',
+    viewWeek: '',
     ai: { imgs: [], last: null, busy: false, brief: '', briefBusy: false, reviewBusy: false }
   };
 
@@ -334,6 +336,7 @@
 
   /* ---------------- 日历 ---------------- */
   function pageCalendar() {
+    if ((st.calMode || 'month') === 'week') return pageTimetable();
     const base = U.toDate(st.calBase);
     const y = base.getFullYear(), m = base.getMonth();
     const first = new Date(y, m, 1);
@@ -353,6 +356,7 @@
     h += '<div class="head"><div><div class="kick">Calendar</div><h1>' + (m + 1) + ' 月</h1>' +
       '<p class="sub">' + y + ' 年 · ' + (weeksLeftText() || ('今天 ' + (new Date().getMonth() + 1) + '/' + new Date().getDate())) + '</p></div>' +
       '<div class="head-side"><button class="icon-btn" data-act="calToday">' + ICON.sun + '</button></div></div>';
+    h += '<div class="seg"><button data-act="calMode" data-m="month" class="on">日历</button><button data-act="calMode" data-m="week">课表</button></div>';
     h += '<div class="card">';
     h += '<div class="cal-top"><div class="mon">' + y + ' / ' + U.pad(m + 1) + '</div><div class="cal-nav">' +
       '<button data-act="calPrev">' + ICON.left + '</button><button data-act="calNext">' + ICON.right + '</button></div></div>';
@@ -375,6 +379,71 @@
       h += '<div class="card" style="padding:8px 12px"><div class="timeline" style="margin:0">' + items.map(itemHTML).join('') + '</div></div>';
     } else {
       h += '<div class="card empty">这天是空的，留白也挺好。</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  /* ---------------- 周课表 ---------------- */
+  function pageTimetable() {
+    const t = U.today();
+    const curMon = U.mondayOf(t);
+    const mon = st.viewWeek ? U.mondayOf(st.viewWeek) : curMon;
+    const semSet = !!S.settings.semesterStart;
+    const wNo = Store.weekNo(mon);
+    const curW = Store.weekNo(curMon);
+    const days = [];
+    for (let i = 0; i < 7; i++) days.push(U.addDays(mon, i));
+    const total = days.reduce(function (a, d) { return a + Store.coursesOn(d).length; }, 0);
+
+    let h = '<div class="page">';
+    h += '<div class="head"><div><div class="kick">Timetable</div><h1>第 ' + (wNo || '?') + ' 周</h1>' +
+      '<p class="sub">' + (U.toDate(mon).getMonth() + 1) + ' 月 ' + U.toDate(mon).getDate() + ' 日 – ' +
+      (U.toDate(U.addDays(mon, 6)).getMonth() + 1) + ' 月 ' + U.toDate(U.addDays(mon, 6)).getDate() + ' 日 · ' + total + ' 节课</p></div>' +
+      '<div class="head-side"><button class="icon-btn" data-act="calToday">' + ICON.sun + '</button></div></div>';
+    h += '<div class="seg"><button data-act="calMode" data-m="month">日历</button><button data-act="calMode" data-m="week" class="on">课表</button></div>';
+
+    h += '<div class="week-nav">' +
+      '<button data-act="weekPrev">' + ICON.left + '</button>' +
+      '<div class="week-nav-mid">' + (wNo === curW ? '本周' : (wNo ? '第 ' + wNo + ' 周' : '')) + '</div>' +
+      '<button data-act="weekNext">' + ICON.right + '</button></div>';
+
+    if (!semSet) {
+      h += '<div class="card" style="border-left:3px solid var(--warn)"><div style="font-size:13.5px;line-height:1.6">' +
+        '还没设「第 1 周周一」，所以现在所有课每天都显示。填一下就按真实周次过滤了。</div>' +
+        '<div class="btn-row"><button class="btn primary" data-act="editSemester">去设置</button></div></div>';
+    }
+
+    days.forEach(function (d, i) {
+      const list = Store.coursesOn(d);
+      const isToday = d === t;
+      h += '<div class="tt-day' + (isToday ? ' today' : '') + '">' +
+        '<div class="tt-dayhead"><b>周' + '一二三四五六日'[i] + '</b><span>' + (U.toDate(d).getMonth() + 1) + '/' + U.toDate(d).getDate() + '</span>' +
+        (isToday ? '<em>今天</em>' : '') + '</div>';
+      if (!list.length) {
+        h += '<div class="tt-empty">没课</div>';
+      } else {
+        list.forEach(function (c) {
+          h += '<div class="tt-item">' +
+            '<div class="tt-time">' + (c.start || '') + '</div>' +
+            '<div class="tt-main"><div class="tt-name">' + U.esc(c.title) + '</div>' +
+            '<div class="tt-meta">' + U.esc(c.periodText || '') + (c.place ? ' · ' + U.esc(c.place) : '') +
+            (c.teacher ? ' · ' + U.esc(c.teacher) : '') + '</div></div></div>';
+        });
+      }
+      h += '</div>';
+    });
+
+    const ended = S.courses.filter(function (c) { return Store.courseLastWeek(c) < (curW || 999); });
+    if (ended.length) {
+      h += '<div class="sec-title">已结课 <span class="tiny muted">' + ended.length + ' 门</span></div>';
+      h += '<div class="card tight">';
+      ended.forEach(function (c) {
+        h += '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px">' +
+          '<span class="chip gray">到第 ' + Store.courseLastWeek(c) + ' 周</span>' +
+          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + U.esc(c.name) + '</span></div>';
+      });
+      h += '</div>';
     }
     h += '</div>';
     return h;
@@ -1059,6 +1128,19 @@
       }
       case 'calToday': st.calBase = U.today(); st.sel = U.today(); render(); break;
       case 'calSelect': st.sel = day; render(); break;
+      case 'calMode':
+        st.calMode = el.getAttribute('data-m') || 'month';
+        if (st.calMode === 'week' && !st.viewWeek) st.viewWeek = U.mondayOf(U.today());
+        render();
+        break;
+      case 'weekPrev':
+        st.viewWeek = U.addDays(st.viewWeek || U.mondayOf(U.today()), -7);
+        render();
+        break;
+      case 'weekNext':
+        st.viewWeek = U.addDays(st.viewWeek || U.mondayOf(U.today()), 7);
+        render();
+        break;
 
       /* 入口 */
       case 'linkOpen': {
@@ -1668,7 +1750,8 @@
     applyTheme();
     Store.save(); // 首次种子也落盘，避免刷新后 uid 变化
     const hash = (location.hash || '').replace('#', '').split(/[&?]/)[0];
-    if (PAGES[hash]) st.page = hash;
+    if (hash === 'week') { st.page = 'calendar'; st.calMode = 'week'; }
+    else if (PAGES[hash]) st.page = hash;
     else if (hash === 'new') st.page = 'today';
     render();
     const hideBoot = () => { const b = $('#boot'); if (b) b.classList.add('hide'); };
