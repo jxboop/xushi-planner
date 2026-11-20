@@ -3,7 +3,11 @@ const PORT = 9223;
 function getJSON(u){return new Promise((res,rej)=>{http.get(u,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})}).on('error',rej)})}
 (async()=>{
   const list = await getJSON(`http://127.0.0.1:${PORT}/json`);
-  const page = list.find(t=>t.type==='page' && /courseTable/.test(t.url)) || list.find(t=>t.type==='page' && /eams/.test(t.url));
+  const MATCH = process.env.CDP_MATCH || '';
+  const page = (MATCH ? list.find(t => t.type === 'page' && t.url.indexOf(MATCH) >= 0) : null)
+    || list.find(t => t.type === 'page' && /courseTable/.test(t.url))
+    || list.find(t => t.type === 'page' && /eams/.test(t.url))
+    || list.find(t => t.type === 'page' && !/^(edge|chrome|devtools|about)/.test(t.url));
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise(r=>ws.addEventListener('open',r));
   let id=0;

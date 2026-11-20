@@ -643,7 +643,9 @@
     h += '<div class="sec-title">诊断</div><div class="list">';
     h += row('bell', 'linear-gradient(135deg,#64748B,#94A3B8)', '运行日志', errs.length ? errs.length + ' 条' : '无错误', 'errLog');
     h += row('chart', 'linear-gradient(135deg,#8B5CF6,#EC4899)', '本地存储配额', '点一下查', 'storageInfo');
-    h += row('spark', 'linear-gradient(135deg,#4D6BFE,#7C3AED)', 'AI 连通测试', S.settings.apiKey ? U.esc(S.settings.model || '') : '未填 Key', 'aiTestQuick');
+    h += row('spark', 'linear-gradient(135deg,#4D6BFE,#7C3AED)', 'AI 对话测试', S.settings.apiKey ? U.esc(S.settings.model || '') : '未填 Key', 'aiTestQuick');
+    h += row('img', 'linear-gradient(135deg,#0EA5E9,#22D3EE)', '视觉模型（读图）',
+      (S.settings.visionKey || S.settings.apiKey) ? U.esc(S.settings.visionModel || '已配置') : '未配置', 'openAI');
     h += '</div>';
 
     h += '<div class="sec-title">环境</div><div class="list">';
@@ -814,7 +816,9 @@
     h += '<div class="field"><label>视觉模型（相册读图用）</label><input name="visionModel" value="' + U.esc(s.visionModel) + '" placeholder="glm-4v-flash"></div>';
     h += '<div class="field"><label>视觉接口地址</label><input name="visionBase" value="' + U.esc(s.visionBase) + '" placeholder="https://open.bigmodel.cn/api/paas/v4" spellcheck="false"></div>';
     h += '<div class="field"><label>视觉模型 Key</label><input name="visionKey" value="' + U.esc(s.visionKey) + '" placeholder="留空则复用上面的 Key" autocomplete="off" spellcheck="false"><div class="hint">DeepSeek 目前没有图片理解，读图需要另配一个视觉模型（智谱 glm-4v-flash 免费、通义 qwen-vl 等，都兼容这个格式）。</div></div>';
-    h += '<div class="btn-row"><button class="btn primary" data-act="saveAI">保存</button><button class="btn" data-act="testAI">测试连接</button></div>';
+    h += '<div class="btn-row"><button class="btn primary" data-act="saveAI">保存</button><button class="btn" data-act="testAI">测试对话</button></div>';
+    h += '<button class="btn block ghost" style="margin-top:9px;font-size:13.5px" data-act="testVisionModel">测试视觉模型（相册读图）</button>';
+    h += '<div class="tiny muted" style="margin:8px 2px 0;line-height:1.6">视觉模型走的是另一套接口，和上面的对话模型互不影响。千问填：<code style="font-size:11px">https://dashscope.aliyuncs.com/compatible-mode/v1</code> + <code style="font-size:11px">qwen3-vl-plus</code></div>';
     openSheet(h);
   }
 
@@ -1217,6 +1221,14 @@
         toast(S.settings.reasoning ? '深度思考已开：解析会更准，也更慢' : '已关闭深度思考');
         break;
       case 'testAI': testAI(); break;
+      case 'testVisionModel': {
+        if (!S.settings.visionKey && !S.settings.apiKey) { toast('先填视觉模型 Key'); break; }
+        toast('正在测视觉模型…', 15000);
+        AI.testVision()
+          .then((r) => toast('视觉模型通了：' + r, 5000))
+          .catch((e) => toast(String(e.message || e).slice(0, 110), 6000));
+        break;
+      }
       case 'courseImport': sheetCourse(); break;
       case 'courseParse': runCourseParse(); break;
       case 'courseSave': saveCourses(); break;

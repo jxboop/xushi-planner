@@ -270,6 +270,19 @@
   }
 
   /** 一周复盘：纯文本 */
+  /** 只验证「视觉接口 + Key + 模型」通不通（发一句纯文本，不花钱） */
+  async function testVision() {
+    const s = S.settings;
+    const key = String(s.visionKey || s.apiKey || '').trim();
+    if (!key) throw new Error('还没填视觉模型 Key');
+    const base = String(s.visionBase || '').trim() || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+    const model = String(s.visionModel || '').trim() || 'qwen3-vl-plus';
+    const r = await raw([{ role: 'user', content: '只回复两个字：正常' }], {
+      base: base, key: key, model: model, maxTokens: 20, temperature: 0
+    });
+    return model + ' → ' + String(r.text || '').trim().slice(0, 24);
+  }
+
   async function review(ctxText) {
     const r = await raw([
       { role: 'system', content: SYS_REVIEW() },
@@ -398,7 +411,7 @@
   }
 
   window.AI = {
-    parse, analyzeImages, parseCourses, brief, review, test, normalize, pickJSON, localParse,
+    parse, analyzeImages, parseCourses, brief, review, testVision, test, normalize, pickJSON, localParse,
     ready() { return !!(S.settings.apiKey || '').trim(); },
     visionReady() { return !!(S.settings.visionKey || S.settings.apiKey || '').trim(); },
     endpoint
