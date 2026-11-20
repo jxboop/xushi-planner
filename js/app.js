@@ -670,6 +670,8 @@
   }
 
   /* ---------------- 维护 ---------------- */
+  let imgStat = '';
+
   function pageMaint() {
     const size = Math.round(new Blob([JSON.stringify(S)]).size / 1024);
     const errs = window.__errs || [];
@@ -698,7 +700,8 @@
 
     h += '<div class="sec-title">诊断</div><div class="list">';
     h += row('bell', 'linear-gradient(135deg,#64748B,#94A3B8)', '运行日志', errs.length ? errs.length + ' 条' : '无错误', 'errLog');
-    h += row('chart', 'linear-gradient(135deg,#8B5CF6,#EC4899)', '本地存储配额', '点一下查', 'storageInfo');
+    h += row('img', 'linear-gradient(135deg,#8B5CF6,#EC4899)', '图片仓（笔记配图）', imgStat || '点一下查', 'imgStat');
+    h += row('chart', 'linear-gradient(135deg,#0EA5E9,#22D3EE)', '本地存储配额', '点一下查', 'storageInfo');
     h += row('spark', 'linear-gradient(135deg,#4D6BFE,#7C3AED)', 'AI 对话测试', S.settings.apiKey ? U.esc(S.settings.model || '') : '未填 Key', 'aiTestQuick');
     h += row('img', 'linear-gradient(135deg,#0EA5E9,#22D3EE)', '视觉模型（读图）',
       (S.settings.visionKey || S.settings.apiKey) ? U.esc(S.settings.visionModel || '已配置') : '未配置', 'openAI');
@@ -812,7 +815,8 @@
       groups[c].forEach(function (n) {
         const d = new Date(n.createdAt);
         html += '<div class="note-card" data-act="openNote" data-id="' + n.id + '">' +
-          (n.images && n.images.length ? '<img class="note-card-thumb" src="' + n.images[0] + '" alt="">' : '') +
+          ((n.imageKeys && n.imageKeys.length) ? '<img class="note-card-thumb" data-thumb="' + n.imageKeys[0] + '" alt="">' :
+            (n.images && n.images.length ? '<img class="note-card-thumb" src="' + n.images[0] + '" alt="">' : '')) +
           '<div class="note-card-body">' +
           '<div class="note-card-head">' + mention(n.type) + '<span class="tiny muted" style="margin-left:auto">' + (d.getMonth() + 1) + '月' + d.getDate() + '日</span></div>' +
           '<div class="note-title">' + U.esc(n.title) + '</div>' +
@@ -822,6 +826,11 @@
       });
     });
     body.innerHTML = html;
+    if (window.IDB) {
+      body.querySelectorAll('img[data-thumb]').forEach(function (img) {
+        IDB.getURL(img.getAttribute('data-thumb')).then(function (url) { if (url) img.src = url; }).catch(function () {});
+      });
+    }
   }
 
   function renderNoteFilters() {
@@ -876,9 +885,17 @@
     const d = new Date(n.createdAt);
     let h = '<h2>' + U.esc(n.title) + '</h2>';
     h += '<p class="sh-sub">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '月' + d.getDate() + '日</p>';
-    if (n.images && n.images.length) {
+    const keys = n.imageKeys || [];
+    if (keys.length) {
+      h += '<div class="note-imgs" id="noteImgs">';
+      keys.forEach(function (k) {
+        h += '<img data-key="' + k + '" data-act="viewKey" alt="">';
+      });
+      h += '</div>';
+      h += '<div class="tiny muted" style="margin:-4px 2px 12px">点图片可以放大看</div>';
+    } else if (n.images && n.images.length) {
       h += '<div class="note-imgs">';
-      n.images.forEach(function (src, i) {
+      n.images.forEach(function (src) {
         h += '<img src="' + src + '" data-act="viewImg" data-src="' + src + '" alt="">';
       });
       h += '</div>';
@@ -903,6 +920,15 @@
     h += '<div class="btn-row" style="margin-top:14px"><button class="btn" data-act="closeSheet">关闭</button>' +
       '<button class="btn ghost danger" data-act="delNote" data-id="' + n.id + '">删除</button></div>';
     openSheet(h);
+
+    if (keys.length && window.IDB) {
+      keys.forEach(function (k) {
+        IDB.getURL(k).then(function (url) {
+          const img = sheetEl.querySelector('img[data-key="' + k + '"]');
+          if (img && url) img.src = url;
+        }).catch(function () {});
+      });
+    }
   }
 
   /* ---------------- 全局搜索 ---------------- */
@@ -1480,6 +1506,9 @@
       case 'calSelect': st.sel = day; render(); break;
       case 'openSearch': openSearch(); break;
       case 'viewImg': viewImage(el.getAttribute('data-src')); break;
+      case 'viewKey':
+        IDB.getURL(el.getAttribute('data-key')).then(function (u) { if (u) viewImage(u); }).catch(function () {});
+        break;
       case 'openNotes': openNotes(); break;
       case 'noteFilter': {
         st.noteFilter = st.noteFilter || { course: '', type: '' };
@@ -1744,6 +1773,15 @@
         try { window.__errs.length = 0; } catch (e) {}
         toast('已清空'); closeSheet(); render(true);
         break;
+      case 'imgStat':
+        if (window.IDB && IDB.available()) {
+          IDB.stats().then(function (r) {
+            imgStat = r.count + ' 张 · ' + (r.bytes / 1048576).toFixed(1) + ' MB';
+            toast('图片仓：' + imgStat, 3800);
+            render(true);
+          }).catch(function () { toast('读不到图片仓'); });
+        } else { toast('这个环境不支持'); }
+        break;
       case 'storageInfo':
         if (navigator.storage && navigator.storage.estimate) {
           navigator.storage.estimate().then((e) => {
@@ -2003,11 +2041,19 @@
       if (mode === 'note') {
         const n = res.note || {};
         if (!n.content && !n.raw) { toast('图里没读出内容'); return; }
+        const imgKeys = [];
+        if (window.IDB && IDB.available()) {
+          for (const d of st.ai.imgs.slice(0, 4)) {
+            try { imgKeys.push(await IDB.put(d)); } catch (e) {}
+          }
+        }
         Store.addNote({
           title: n.title, course: n.course, kind: n.kind,
           type: n.type, summary: n.summary, outline: n.outline,
           content: n.content, raw: n.raw, key: n.key,
-          images: st.ai.imgs.slice(0, 4), thumb: st.ai.imgs[0] || '',
+          imageKeys: imgKeys,
+          images: imgKeys.length ? [] : st.ai.imgs.slice(0, 4),
+          thumb: imgKeys.length ? '' : (st.ai.imgs[0] || ''),
           want: st.ai.want || ''
         });
         st.ai.imgs = [];
