@@ -511,6 +511,8 @@
     h += '<input id="imgInput" type="file" accept="image/*" multiple style="display:none">';
     if (st.ai.imgs.length) {
       h += '<div class="thumbs">' + st.ai.imgs.map((x, i) => '<div class="thumb"><img src="' + x + '"><b data-act="dropImg" data-i="' + i + '">×</b></div>').join('') + '</div>';
+      h += '<div class="field" style="margin-top:12px"><label>这次想让它做什么？（可空）</label>' +
+        '<textarea id="aiWant" placeholder="比如：只提取公式和定义 / 整理成期末复习提纲 / 把作业要求和截止时间挑出来" style="min-height:64px;font-size:14.5px">' + U.esc(st.ai.want || '') + '</textarea></div>';
       h += '<div class="btn-row"><button class="btn primary" data-act="aiVision" data-mode="note">' + (st.ai.visionBusy ? '<span class="spin"></span>' : ICON.spark) + ' 整理成笔记</button></div>';
       h += '<div class="btn-row" style="margin-top:8px"><button class="btn" data-act="aiVision" data-mode="plan">生成日程/待办</button><button class="btn ghost" data-act="clearImg">清空</button></div>';
     } else {
@@ -770,36 +772,95 @@
   window.render = render;
 
   /* ---------------- 时间轴 / 日历交互 ---------------- */
+  /* ---------------- 看图 ---------------- */
+  function viewImage(src) {
+    let layer = document.getElementById('imgLayer');
+    if (layer) layer.remove();
+    layer = document.createElement('div');
+    layer.id = 'imgLayer';
+    layer.className = 'img-layer';
+    layer.innerHTML = '<img src="' + src + '" alt="">';
+    layer.addEventListener('click', function () { layer.remove(); });
+    document.body.appendChild(layer);
+    requestAnimationFrame(function () { layer.classList.add('on'); });
+  }
+
   /* ---------------- 笔记 ---------------- */
+  function renderNotesBody() {
+    const body = document.getElementById('notesBody');
+    if (!body) return;
+    const f = st.noteFilter || {};
+    let list = S.notes.slice();
+    if (f.course) list = list.filter(function (n) { return n.course === f.course; });
+    if (f.type) list = list.filter(function (n) { return (n.type || 'concept') === f.type; });
+
+    if (!list.length) {
+      body.innerHTML = '<div class="empty" style="padding:50px 20px">这个筛选下没有笔记</div>';
+      return;
+    }
+    const groups = {};
+    const order = [];
+    list.forEach(function (n) {
+      const c = n.course || '未分类';
+      if (!groups[c]) { groups[c] = []; order.push(c); }
+      groups[c].push(n);
+    });
+
+    let html = '';
+    order.forEach(function (c) {
+      html += '<div class="note-group-title">' + U.esc(c) + ' <span>' + groups[c].length + '</span></div>';
+      groups[c].forEach(function (n) {
+        const d = new Date(n.createdAt);
+        html += '<div class="note-card" data-act="openNote" data-id="' + n.id + '">' +
+          (n.images && n.images.length ? '<img class="note-card-thumb" src="' + n.images[0] + '" alt="">' : '') +
+          '<div class="note-card-body">' +
+          '<div class="note-card-head">' + mention(n.type) + '<span class="tiny muted" style="margin-left:auto">' + (d.getMonth() + 1) + '月' + d.getDate() + '日</span></div>' +
+          '<div class="note-title">' + U.esc(n.title) + '</div>' +
+          '<div class="note-preview">' + U.esc(String(n.summary || n.content || n.raw).slice(0, 66)) + '</div>' +
+          ((n.key && n.key.length) ? '<div class="note-keys">' + n.key.slice(0, 4).map(function (k) { return '<span>' + U.esc(k) + '</span>'; }).join('') + '</div>' : '') +
+          '</div></div>';
+      });
+    });
+    body.innerHTML = html;
+  }
+
+  function renderNoteFilters() {
+    const box = document.getElementById('noteFilters');
+    if (!box) return;
+    const f = st.noteFilter || {};
+    const courses = [];
+    S.notes.forEach(function (n) { if (courses.indexOf(n.course) < 0) courses.push(n.course); });
+    const types = [];
+    S.notes.forEach(function (n) { const t = n.type || 'concept'; if (types.indexOf(t) < 0) types.push(t); });
+
+    let h = '<div class="pill-row">';
+    h += '<button class="tag-btn' + (!f.course ? ' on' : '') + '" data-act="noteFilter" data-k="course" data-v="">全部课</button>';
+    courses.forEach(function (c) {
+      h += '<button class="tag-btn' + (f.course === c ? ' on' : '') + '" data-act="noteFilter" data-k="course" data-v="' + U.esc(c) + '">' + U.esc(c) + '</button>';
+    });
+    h += '</div><div class="pill-row">';
+    h += '<button class="tag-btn' + (!f.type ? ' on' : '') + '" data-act="noteFilter" data-k="type" data-v="">全部类型</button>';
+    types.forEach(function (t) {
+      h += '<button class="tag-btn' + (f.type === t ? ' on' : '') + '" data-act="noteFilter" data-k="type" data-v="' + t + '">' + (NOTE_TYPES[t] || t) + '</button>';
+    });
+    h += '</div>';
+    box.innerHTML = h;
+  }
+
   function openNotes() {
     if (document.getElementById('notesLayer')) return;
+    st.noteFilter = st.noteFilter || { course: '', type: '' };
     const layer = document.createElement('div');
     layer.id = 'notesLayer';
     layer.className = 'search-layer notes-layer';
-    const groups = Store.notesByCourse();
-    let body = '';
-    if (!groups.length) {
-      body = '<div class="empty" style="padding:50px 20px">还没有笔记。<br>去 AI 页选几张图，点「整理成笔记」。</div>';
-    } else {
-      groups.forEach(function (g) {
-        body += '<div class="note-group-title">' + U.esc(g.course) + ' <span>' + g.items.length + '</span></div>';
-        g.items.forEach(function (n) {
-          const d = new Date(n.createdAt);
-          body += '<div class="note-card" data-act="openNote" data-id="' + n.id + '">' +
-            '<div class="note-card-head">' + mention(n.type) + '<span class="chip gray">' + U.esc(n.kind) + '</span>' +
-            '<span class="tiny muted">' + (d.getMonth() + 1) + '月' + d.getDate() + '日</span></div>' +
-            '<div class="note-title">' + U.esc(n.title) + '</div>' +
-            '<div class="note-preview">' + U.esc(String(n.content || n.raw).slice(0, 70)) + '</div>' +
-            (n.key && n.key.length ? '<div class="note-keys">' + n.key.map(function (k) { return '<span>' + U.esc(k) + '</span>'; }).join('') + '</div>' : '') +
-            '</div>';
-        });
-      });
-    }
     layer.innerHTML = '<div class="search-head"><div class="notes-title">笔记</div>' +
       '<button class="search-cancel" data-act="closeNotes">完成</button></div>' +
-      '<div class="search-body">' + body + '</div>';
+      '<div class="note-filters" id="noteFilters"></div>' +
+      '<div class="search-body" id="notesBody"></div>';
     document.body.appendChild(layer);
     requestAnimationFrame(function () { layer.classList.add('on'); });
+    renderNoteFilters();
+    renderNotesBody();
   }
 
   function closeNotes() {
@@ -815,7 +876,15 @@
     const d = new Date(n.createdAt);
     let h = '<h2>' + U.esc(n.title) + '</h2>';
     h += '<p class="sh-sub">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '月' + d.getDate() + '日</p>';
-    if (n.thumb) h += '<img src="' + n.thumb + '" style="width:100%;border-radius:14px;margin-bottom:12px;display:block" alt="">';
+    if (n.images && n.images.length) {
+      h += '<div class="note-imgs">';
+      n.images.forEach(function (src, i) {
+        h += '<img src="' + src + '" data-act="viewImg" data-src="' + src + '" alt="">';
+      });
+      h += '</div>';
+      h += '<div class="tiny muted" style="margin:-4px 2px 12px">点图片可以放大看</div>';
+    }
+    if (n.want) h += '<div class="note-want">当时的要求：' + U.esc(n.want) + '</div>';
     if (n.summary) h += '<div class="note-summary">' + U.esc(n.summary) + '</div>';
     if (n.outline && n.outline.length) {
       h += '<div class="note-outline">';
@@ -1410,7 +1479,16 @@
       case 'calToday': st.calBase = U.today(); st.sel = U.today(); render(); break;
       case 'calSelect': st.sel = day; render(); break;
       case 'openSearch': openSearch(); break;
+      case 'viewImg': viewImage(el.getAttribute('data-src')); break;
       case 'openNotes': openNotes(); break;
+      case 'noteFilter': {
+        st.noteFilter = st.noteFilter || { course: '', type: '' };
+        const k = el.getAttribute('data-k'), v = el.getAttribute('data-v') || '';
+        st.noteFilter[k] = v;
+        renderNoteFilters();
+        renderNotesBody();
+        break;
+      }
       case 'closeNotes': closeNotes(); break;
       case 'openNote': openNote(id); break;
       case 'delNote':
@@ -1503,7 +1581,7 @@
         const i = +el.getAttribute('data-i');
         st.ai.imgs.splice(i, 1); render(); break;
       }
-      case 'clearImg': st.ai.imgs = []; render(); break;
+      case 'clearImg': st.ai.imgs = []; st.ai.want = ''; render(); break;
       case 'aiVision': runVision(el.getAttribute('data-mode') || 'plan'); break;
       case 'aiBrief': runBrief(); break;
       case 'openAI': sheetAI(); break;
@@ -1921,7 +1999,7 @@
     st.ai.visionBusy = true; render(true);
     toast(mode === 'note' ? '正在读图写笔记…' : '正在读图…', 25000);
     try {
-      const res = await AI.analyzeImages(st.ai.imgs, mode);
+      const res = await AI.analyzeImages(st.ai.imgs, mode, st.ai.want || '');
       if (mode === 'note') {
         const n = res.note || {};
         if (!n.content && !n.raw) { toast('图里没读出内容'); return; }
@@ -1929,9 +2007,11 @@
           title: n.title, course: n.course, kind: n.kind,
           type: n.type, summary: n.summary, outline: n.outline,
           content: n.content, raw: n.raw, key: n.key,
-          thumb: st.ai.imgs[0] || ''
+          images: st.ai.imgs.slice(0, 4), thumb: st.ai.imgs[0] || '',
+          want: st.ai.want || ''
         });
         st.ai.imgs = [];
+        st.ai.want = '';
         render();
         toast('笔记已保存到「' + (n.course || '未分类') + '」', 3200);
         return;
@@ -2129,6 +2209,7 @@
   /* 快捷表单提交（顶部输入框走这里，避免每次重渲染丢焦点） */
   document.addEventListener('input', function (e) {
     if (e.target && e.target.id === 'aiInput') st.ai.input = e.target.value;
+    if (e.target && e.target.id === 'aiWant') st.ai.want = e.target.value;
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && e.target && e.target.id === 'quickInput') {

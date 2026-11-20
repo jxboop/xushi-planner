@@ -254,9 +254,14 @@
     return normalize(j);
   }
 
-  async function analyzeImages(dataUrls, mode) {
+  async function analyzeImages(dataUrls, mode, want) {
     const isNote = mode === 'note';
-    const content = [{ type: 'text', text: isNote ? '把这些图整理成一则笔记。' : '请整理这些图片，最多挑最重要的 6 条，合并重复内容。' }];
+    const ask = String(want || '').trim();
+    let hint = isNote ? '把这些图整理成一则笔记。' : '请整理这些图片，最多挑最重要的 6 条，合并重复内容。';
+    if (ask) {
+      hint += String.fromCharCode(10) + '用户这次特别要求（优先满足，若与默认格式冲突以用户为准）：' + ask;
+    }
+    const content = [{ type: 'text', text: hint }];
     dataUrls.slice(0, 6).forEach((u) => content.push({ type: 'image_url', image_url: { url: u } }));
     const s = S.settings;
     const r = await raw([{ role: 'system', content: isNote ? SYS_NOTE() : SYS_VISION() }, { role: 'user', content: content }], {

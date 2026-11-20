@@ -691,10 +691,14 @@
     const n = Object.assign({
       id: U.uid(), title: '未命名', course: '未分类', kind: '其他',
       type: 'concept', summary: '', outline: [],
-      content: '', raw: '', key: [], thumb: '', createdAt: Date.now()
+      content: '', raw: '', key: [], thumb: '', images: [], want: '', createdAt: Date.now()
     }, o || {});
     S.notes.unshift(n);
-    if (S.notes.length > 300) S.notes.length = 300;
+    if (S.notes.length > 120) S.notes.length = 120;
+    // 图片吃空间：笔记超过 40 条就把老笔记的图清掉（留文本）
+    S.notes.forEach(function (x, i) {
+      if (i >= 40 && x.images && x.images.length) { x.images = []; x.thumb = ''; }
+    });
     save();
     return n;
   }
