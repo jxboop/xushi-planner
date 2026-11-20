@@ -38,7 +38,8 @@
     target: sv('<circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/>'),
     alarm: sv('<circle cx="12" cy="13.6" r="6.9"/><path d="M12 10.2v3.4l2.3 1.5M5.4 6.6 7.1 4.8M18.6 6.6 16.9 4.8"/>'),
     more: sv('<circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/>'),
-    wrench: sv('<path d="M20.2 5.5a4.5 4.5 0 01-5.7 5.7l-7.8 7.8a2 2 0 01-2.9-2.9l7.8-7.8a4.5 4.5 0 015.7-5.7l-2.7 2.7.9 2.3 2.3.9z"/>')
+    wrench: sv('<path d="M20.2 5.5a4.5 4.5 0 01-5.7 5.7l-7.8 7.8a2 2 0 01-2.9-2.9l7.8-7.8a4.5 4.5 0 015.7-5.7l-2.7 2.7.9 2.3 2.3.9z"/>'),
+    search: sv('<circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8L20 20"/>')
   };
   const ARW = '<svg class="arw" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.6l6.4 6.4-6.4 6.4"/></svg>';
   const TAGS = ['课程', '作业', '考试', '实验', '会议', '社团', '复习', '生活', '其他'];
@@ -236,6 +237,8 @@
       '<div class="stat"><b>' + (S.todos.filter((x) => !x.done).length) + '</b><span>待办</span></div>' +
       '<div class="stat"><b>' + (overdue.length || 0) + '</b><span>逾期</span></div>' +
       '</div><div class="hero-bar"><i style="width:' + s.rate + '%"></i></div></div>';
+
+    h += '<button class="searchbar" data-act="openSearch">' + ICON.search + '<span>搜日程、待办、课程、入口</span></button>';
 
     h += '<form class="quick" data-act="quick"><input id="quickInput" placeholder="说一句：明天下午三点开会" autocomplete="off"><button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
 
@@ -708,11 +711,126 @@
       view.dataset.page = st.page;
       view.innerHTML = (PAGES[st.page] || pageToday)();
       view.scrollTop = renderScroll ? top : 0;
+      const pageEl = view.querySelector('.page');
+      if (pageEl && st.slide) { pageEl.classList.add('slide-' + st.slide); }
+      st.slide = '';
     }, 0);
   }
   window.render = render;
 
   /* ---------------- 时间轴 / 日历交互 ---------------- */
+  /* ---------------- 全局搜索 ---------------- */
+  function searchAll(kw) {
+    const k = String(kw || '').trim().toLowerCase();
+    if (!k) return [];
+    const hit = function (s) { return String(s || '').toLowerCase().indexOf(k) >= 0; };
+    const out = [];
+
+    S.events.forEach(function (e) {
+      if (hit(e.title) || hit(e.note) || hit(e.place)) {
+        out.push({
+          type: '日程', title: e.title,
+          meta: [U.relLabel(e.date), e.start, e.place].filter(Boolean).join(' · '),
+          act: 'open', kind: 'event', id: e.id
+        });
+      }
+    });
+    S.todos.forEach(function (t) {
+      if (hit(t.title)) {
+        out.push({ type: '待办', title: t.title, meta: t.date ? U.relLabel(t.date) : '未排期', act: 'open', kind: 'todo', id: t.id });
+      }
+    });
+    S.courses.forEach(function (c) {
+      if (hit(c.name) || hit(c.place) || hit(c.teacher)) {
+        const sp = Store.periodSpan(c.periods || []);
+        out.push({
+          type: '课程', title: c.name,
+          meta: ['周' + '一二三四五六日'[(c.day || 1) - 1], (c.periods || []).join(',') + ' 节', sp.start, c.place].filter(Boolean).join(' · '),
+          act: 'goWeek'
+        });
+      }
+    });
+    Store.ddlsOpen().forEach(function (d) {
+      if (hit(d.title) || hit(d.note)) {
+        const lb = Store.ddlLabel(d.dueMs);
+        out.push({ type: 'DDL', title: d.title, meta: lb.text + (d.note ? ' · ' + d.note : ''), act: 'ddlOpen', id: d.id });
+      }
+    });
+    S.links.forEach(function (l) {
+      if (hit(l.title) || hit(l.url)) {
+        out.push({ type: '入口', title: l.title, meta: U.host(l.url), act: 'linkOpen', id: l.id, url: l.url });
+      }
+    });
+    S.inbox.forEach(function (m) {
+      if (!m.done && hit(m.text)) {
+        out.push({ type: '消息', title: m.text.slice(0, 40), meta: m.from || '收件箱', act: 'inboxOpen', id: m.id });
+      }
+    });
+    // 课程名去重（同一门课会出现多条）
+    const seen = {};
+    return out.filter(function (x) {
+      const key = x.type + '|' + x.title;
+      if (x.type === '课程') { if (seen[key]) return false; seen[key] = 1; }
+      return true;
+    }).slice(0, 40);
+  }
+
+  function renderSearch(kw) {
+    const box = document.getElementById('searchResults');
+    if (!box) return;
+    const list = searchAll(kw);
+    if (!String(kw || '').trim()) {
+      box.innerHTML = '<div class="search-hint">' +
+        ['微积分', '实验报告', '四级', '教务处'].map(function (x) {
+          return '<button class="tag-btn" data-act="searchPick" data-w="' + U.esc(x) + '">' + U.esc(x) + '</button>';
+        }).join('') + '</div>';
+      return;
+    }
+    if (!list.length) {
+      box.innerHTML = '<div class="empty" style="padding:40px 20px">没找到「' + U.esc(kw) + '」</div>';
+      return;
+    }
+    const groups = {};
+    list.forEach(function (x) { (groups[x.type] = groups[x.type] || []).push(x); });
+    let h = '';
+    Object.keys(groups).forEach(function (g) {
+      h += '<div class="search-group-title">' + g + '</div>';
+      groups[g].forEach(function (x) {
+        h += '<div class="search-row" data-act="' + x.act + '" data-id="' + (x.id || '') + '" data-url="' + U.esc(x.url || '') + '" data-kind="' + (x.kind || '') + '">' +
+          '<div class="sr-type">' + x.type + '</div>' +
+          '<div class="sr-main"><div class="sr-title">' + U.esc(x.title) + '</div>' +
+          '<div class="sr-meta">' + U.esc(x.meta) + '</div></div></div>';
+      });
+    });
+    box.innerHTML = h;
+  }
+
+  function openSearch() {
+    if (document.getElementById('searchLayer')) { document.getElementById('searchInput').focus(); return; }
+    const layer = document.createElement('div');
+    layer.id = 'searchLayer';
+    layer.className = 'search-layer';
+    layer.innerHTML =
+      '<div class="search-head"><div class="search-field">' + ICON.search +
+      '<input id="searchInput" placeholder="搜日程、待办、课程、入口" autocomplete="off" autocorrect="off" spellcheck="false">' +
+      '</div><button class="search-cancel" data-act="closeSearch">取消</button></div>' +
+      '<div class="search-body" id="searchResults"></div>';
+    document.body.appendChild(layer);
+    requestAnimationFrame(function () { layer.classList.add('on'); });
+    const inp = document.getElementById('searchInput');
+    inp.addEventListener('input', function () { renderSearch(inp.value); });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSearch(); });
+    setTimeout(function () { inp.focus(); }, 120);
+    renderSearch('');
+  }
+
+  function closeSearch() {
+    const layer = document.getElementById('searchLayer');
+    if (!layer) return;
+    layer.classList.remove('on');
+    setTimeout(function () { layer.remove(); }, 260);
+  }
+
   function openLinkEdit(id) {
     const l = id ? S.links.find((x) => x.id === id) : { title: '', url: '', group: '常用', color: '' };
     if (!l) return;
@@ -770,7 +888,11 @@
     setTimeout(() => a.remove(), 500);
   }
 
+  const PAGE_ORDER = ['today', 'calendar', 'ai', 'links', 'me', 'maint'];
+
   function go(page) {
+    const from = PAGE_ORDER.indexOf(st.page), to = PAGE_ORDER.indexOf(page);
+    st.slide = to > from ? 'right' : (to < from ? 'left' : '');
     st.page = page;
     try { history.replaceState(null, '', '#' + page); } catch (e) {}
     render();
@@ -1065,6 +1187,37 @@
   }
   setInterval(tick, 1000);
 
+  /* 左右滑动切页（避开横向滚动条、输入框、长按区域） */
+  let swX = 0, swY = 0, swOn = false;
+  view.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { swOn = false; return; }
+    if (e.target.closest('.pill-row, .seg, input, textarea, select, .week-nav, .cal-grid, .grid-links')) { swOn = false; return; }
+    swX = e.touches[0].clientX; swY = e.touches[0].clientY; swOn = true;
+  }, { passive: true });
+  view.addEventListener('touchend', function (e) {
+    if (!swOn) return;
+    swOn = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swX, dy = t.clientY - swY;
+    if (Math.abs(dx) < 72 || Math.abs(dy) > Math.abs(dx) * 0.9) return;
+    const i = PAGE_ORDER.indexOf(st.page);
+    if (dx < 0 && i < PAGE_ORDER.length - 1) go(PAGE_ORDER[i + 1]);
+    else if (dx > 0 && i > 0) go(PAGE_ORDER[i - 1]);
+  }, { passive: true });
+
+  /* 点击涟漪：按下去有个光晕从指尖扩散 */
+  view.addEventListener('pointerdown', function (e) {
+    const t = e.target.closest('.ev, .lk, .tt-item, .search-row, .card');
+    if (!t || t.classList.contains('hero')) return;
+    const rect = t.getBoundingClientRect();
+    const sp = document.createElement('span');
+    sp.className = 'ripple';
+    sp.style.left = (e.clientX - rect.left) + 'px';
+    sp.style.top = (e.clientY - rect.top) + 'px';
+    t.appendChild(sp);
+    setTimeout(function () { sp.remove(); }, 620);
+  }, { passive: true });
+
   /* 长按入口 → 编辑（入口页副标题写的就是「长按编辑」） */
   let pressTimer = 0;
   view.addEventListener('pointerdown', function (e) {
@@ -1087,6 +1240,7 @@
     const el = e.target.closest('[data-act]');
     if (!el) return;
     if (el.dataset && el.dataset.lp) { delete el.dataset.lp; return; }
+    if (el.closest('#searchLayer') && act !== 'closeSearch' && act !== 'searchPick') closeSearch();
     const act = el.getAttribute('data-act');
     const id = el.getAttribute('data-id') || '';
     const day = el.getAttribute('data-day') || '';
@@ -1097,6 +1251,8 @@
       case 'go': go(el.getAttribute('data-page')); break;
 
       case 'toggle': {
+        el.classList.add('pop');
+        setTimeout(function () { el.classList.remove('pop'); }, 460);
         Store.toggleItem(el.getAttribute('data-kind'), id);
         if (navigator.vibrate) navigator.vibrate(8);
         render(true);
@@ -1132,6 +1288,16 @@
       }
       case 'calToday': st.calBase = U.today(); st.sel = U.today(); render(); break;
       case 'calSelect': st.sel = day; render(); break;
+      case 'openSearch': openSearch(); break;
+      case 'closeSearch': closeSearch(); break;
+      case 'searchPick': {
+        const inp = document.getElementById('searchInput');
+        if (inp) { inp.value = el.getAttribute('data-w') || ''; renderSearch(inp.value); inp.focus(); }
+        break;
+      }
+      case 'goWeek':
+        closeSearch(); st.calMode = 'week'; st.page = 'calendar'; render();
+        break;
       case 'calMode':
         st.calMode = el.getAttribute('data-m') || 'month';
         if (st.calMode === 'week' && !st.viewWeek) st.viewWeek = U.mondayOf(U.today());
