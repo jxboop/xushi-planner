@@ -690,6 +690,7 @@
   function addNote(o) {
     const n = Object.assign({
       id: U.uid(), title: '未命名', course: '未分类', kind: '其他',
+      type: 'concept', summary: '', outline: [],
       content: '', raw: '', key: [], thumb: '', createdAt: Date.now()
     }, o || {});
     S.notes.unshift(n);

@@ -154,27 +154,42 @@
     const list = (S.courses || []).map(function (c) { return c.name; });
     const uniq = [];
     list.forEach(function (n) { if (uniq.indexOf(n) < 0) uniq.push(n); });
+    const NL = String.fromCharCode(10);
     return [
       '你是「序时」App 的学习笔记助手，服务对象是中国大学生（电子科技大学大一）。',
       nowLine(),
       '用户会发来相册里的图片：课堂板书、PPT 课件、作业要求、教务通知、群聊记录、教材拍照。',
-      '请读懂内容，整理成一则**可以直接复习的笔记**，并判断它属于哪门课。',
+      '你的任务：读懂内容，按一套固定的科学方法分类归纳，整理成可直接复习的笔记。',
       '',
       '用户这学期在上的课（course 必须从这里选，对不上就填「未分类」）：',
-      uniq.length ? uniq.map(function (n) { return '- ' + n; }).join(String.fromCharCode(10)) : '- （暂未导入课表）',
+      uniq.length ? uniq.map(function (n) { return '- ' + n; }).join(NL) : '- （暂未导入课表）',
+      '',
+      '【分类三步法，必须按这个顺序执行】',
+      '第一步 · 学科归属：判断这页属于哪门课，只能从上面的课程列表里选。',
+      '第二步 · 知识类型（type，只能取一个）：',
+      '  concept 概念定义 / theorem 定理公式 / method 解题方法 / example 例题演算 /',
+      '  procedure 实验步骤 / argument 论述观点 / task 作业要求 / notice 通知事项',
+      '第三步 · 归纳结构：按学科惯例把零散内容归纳成层级，只保留图里真实存在的环节，没有的不要硬凑：',
+      '  · 数学物理：定义 → 条件 → 结论 → 推导要点 → 例题 → 易错点',
+      '  · 实验课：目的 → 原理 → 器材步骤 → 数据处理 → 误差来源',
+      '  · 语言课：语言点 → 用法 → 例句 → 常见错误',
+      '  · 思政文科：核心观点 → 论据 → 结论',
+      '  · 任务通知：要求 → 截止时间 → 交付物',
       '',
       '只输出一个 JSON 对象，不要解释、不要 markdown 代码块：',
-      '{"course":"课程名","title":"笔记标题（≤16字）","kind":"板书|课件|作业|通知|其他",',
-      ' "content":"整理后的笔记正文：分点写，公式和数字原样保留，≤400 字",',
+      '{"course":"课程名","title":"标题（≤16字）","kind":"板书|课件|作业|通知|其他",',
+      ' "type":"concept|theorem|method|example|procedure|argument|task|notice",',
+      ' "summary":"一句话说清这页在讲什么",',
+      ' "outline":[{"head":"定义","points":["要点1","要点2"]}],',
       ' "key":["3-5 个关键词"],"raw":"图里的关键原文，≤300 字"}',
       '规则：',
-      '1. content 是给人复习用的，不是流水账：先写这页在讲什么，再列要点。',
-      '2. 有公式、定义、定理、代码，原样保留不要改写。',
-      '3. 图片是作业要求时，kind 填「作业」，content 里写清楚要求和截止时间。',
-      '4. 完全不认识的课，course 填「未分类」，不要瞎猜。',
-      '5. 看不清的地方写「（图不清）」，不要编。',
-      '6. 多张图是同一门课的内容就合并成一则笔记。'
-    ].join(String.fromCharCode(10));
+      '1. outline 是归纳出来的骨架，每节 2-5 条要点，不要抄原文句子，浓缩成能复习的短语。',
+      '2. 公式、定义、定理、代码原样保留，不要改写符号。',
+      '3. summary 一句话讲清"这页在解决什么问题"，不要复述标题。',
+      '4. 是作业要求时 type 填 task，outline 里写清要求和截止时间。',
+      '5. 看不清的写「（图不清）」，不要编造。',
+      '6. 多张图是同一门课同一主题就合并成一则。'
+    ].join(NL);
   };
 
   const SYS_COURSE = function () {
@@ -254,11 +269,20 @@
     });
     const j = pickJSON(r.text) || {};
     if (isNote) {
+      const outline = Array.isArray(j.outline) ? j.outline.slice(0, 8).map(function (sec) {
+        return {
+          head: String(sec.head || '').slice(0, 16),
+          points: (Array.isArray(sec.points) ? sec.points : []).slice(0, 6).map(function (x) { return String(x).slice(0, 120); })
+        };
+      }).filter(function (sec) { return sec.points.length; }) : [];
       return {
         note: {
           course: String(j.course || '未分类').trim().slice(0, 20),
           title: String(j.title || '未命名笔记').trim().slice(0, 24),
           kind: String(j.kind || '其他').trim().slice(0, 6),
+          type: String(j.type || 'concept').trim().slice(0, 12),
+          summary: String(j.summary || '').trim().slice(0, 80),
+          outline: outline,
           content: String(j.content || '').trim().slice(0, 900),
           key: Array.isArray(j.key) ? j.key.slice(0, 6).map(function (x) { return String(x).slice(0, 12); }) : [],
           raw: String(j.raw || '').trim().slice(0, 600)

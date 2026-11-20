@@ -46,6 +46,20 @@
   const APP_VERSION = '1.7.0';
 
   /* 标签配色：一眼分清作业/考试/实验 */
+  const NOTE_TYPES = {
+    concept: '概念', theorem: '定理/公式', method: '解题方法', example: '例题',
+    procedure: '实验步骤', argument: '论述', task: '作业要求', notice: '通知', other: '其他'
+  };
+  const TYPE_COLORS = {
+    concept: '#3B6CFF', theorem: '#EF4444', method: '#10B981', example: '#F59E0B',
+    procedure: '#8B5CF6', argument: '#0EA5E9', task: '#EC4899', notice: '#64748B', other: '#94A3B8'
+  };
+  function mention(t) {
+    if (!t) return '';
+    const c = TYPE_COLORS[t] || '#94A3B8';
+    return '<span class="chip" style="background:' + c + '1F;color:' + c + '">' + (NOTE_TYPES[t] || t) + '</span>';
+  }
+
   const TAG_COLORS = {
     '课程': '#3B6CFF', '作业': '#F59E0B', '考试': '#EF4444', '实验': '#8B5CF6',
     '会议': '#0EA5E9', '社团': '#EC4899', '复习': '#10B981', '生活': '#64748B', '其他': '#94A3B8'
@@ -772,7 +786,7 @@
         g.items.forEach(function (n) {
           const d = new Date(n.createdAt);
           body += '<div class="note-card" data-act="openNote" data-id="' + n.id + '">' +
-            '<div class="note-card-head"><span class="chip gray">' + U.esc(n.kind) + '</span>' +
+            '<div class="note-card-head">' + mention(n.type) + '<span class="chip gray">' + U.esc(n.kind) + '</span>' +
             '<span class="tiny muted">' + (d.getMonth() + 1) + '月' + d.getDate() + '日</span></div>' +
             '<div class="note-title">' + U.esc(n.title) + '</div>' +
             '<div class="note-preview">' + U.esc(String(n.content || n.raw).slice(0, 70)) + '</div>' +
@@ -802,6 +816,15 @@
     let h = '<h2>' + U.esc(n.title) + '</h2>';
     h += '<p class="sh-sub">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '月' + d.getDate() + '日</p>';
     if (n.thumb) h += '<img src="' + n.thumb + '" style="width:100%;border-radius:14px;margin-bottom:12px;display:block" alt="">';
+    if (n.summary) h += '<div class="note-summary">' + U.esc(n.summary) + '</div>';
+    if (n.outline && n.outline.length) {
+      h += '<div class="note-outline">';
+      n.outline.forEach(function (sec) {
+        h += '<div class="no-head">' + U.esc(sec.head) + '</div><ul class="no-list">' +
+          sec.points.map(function (pt) { return '<li>' + U.esc(pt) + '</li>'; }).join('') + '</ul>';
+      });
+      h += '</div>';
+    }
     if (n.content) h += '<div class="note-body">' + U.esc(n.content) + '</div>';
     if (n.key && n.key.length) h += '<div class="note-keys" style="margin-top:12px">' + n.key.map(function (k) { return '<span>' + U.esc(k) + '</span>'; }).join('') + '</div>';
     if (n.raw) {
@@ -1904,6 +1927,7 @@
         if (!n.content && !n.raw) { toast('图里没读出内容'); return; }
         Store.addNote({
           title: n.title, course: n.course, kind: n.kind,
+          type: n.type, summary: n.summary, outline: n.outline,
           content: n.content, raw: n.raw, key: n.key,
           thumb: st.ai.imgs[0] || ''
         });
