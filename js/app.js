@@ -1141,7 +1141,8 @@
       '【没做完的日程/待办】\n' + line(openEv.concat(openTodo), fmt) + '\n\n' +
       '【逾期未处理】\n' + line(over, fmt) + '\n\n' +
       '【进行中的 DDL】\n' + line(Store.ddlsOpen(), (d) => '- ' + d.title + ' 截止 ' + d.date) + '\n\n' +
-      '【最近发的消息类记录】\n' + line(S.inbox.filter((m) => !m.done), (m) => '- ' + String(m.text).slice(0, 50));
+      '【最近发的消息类记录】\n' + line(S.inbox.filter((m) => !m.done), (m) => '- ' + String(m.text).slice(0, 50)) + '\n\n' +
+      '【本周记的笔记】\n' + line(S.notes.filter((n) => inR(U.ymd(new Date(n.createdAt)))), (n) => '- ' + n.course + '：' + n.title + ((n.key && n.key.length) ? '（' + n.key.join('、') + '）' : ''));
   }
 
   async function runReview() {
