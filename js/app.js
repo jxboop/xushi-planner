@@ -497,8 +497,8 @@
     h += '<input id="imgInput" type="file" accept="image/*" multiple style="display:none">';
     if (st.ai.imgs.length) {
       h += '<div class="thumbs">' + st.ai.imgs.map((x, i) => '<div class="thumb"><img src="' + x + '"><b data-act="dropImg" data-i="' + i + '">×</b></div>').join('') + '</div>';
-      h += '<div class="btn-row"><button class="btn primary" data-act="aiVision">' + (st.ai.visionBusy ? '<span class="spin"></span>' : ICON.spark) + ' 读图并整理</button>' +
-        '<button class="btn" data-act="clearImg">清空</button></div>';
+      h += '<div class="btn-row"><button class="btn primary" data-act="aiVision" data-mode="note">' + (st.ai.visionBusy ? '<span class="spin"></span>' : ICON.spark) + ' 整理成笔记</button></div>';
+      h += '<div class="btn-row" style="margin-top:8px"><button class="btn" data-act="aiVision" data-mode="plan">生成日程/待办</button><button class="btn ghost" data-act="clearImg">清空</button></div>';
     } else {
       h += '<div class="tiny muted" style="margin-top:10px;line-height:1.6">' +
         (AI.visionReady() ? '当前视觉模型：' + U.esc(S.settings.visionModel || '') : '未配置视觉模型，可用「长按图片 → 提取文字 → 粘贴到上面的框」的方式变通') + '</div>';
@@ -532,6 +532,24 @@
       h += '<button class="btn primary block" style="margin-top:13px" data-act="aiReview">生成这周复盘</button>';
     }
     h += '</div>';
+
+    // 4.5 笔记
+    h += '<div class="sec-title">笔记 <button class="link" data-act="openNotes">全部 ' + S.notes.length + '</button></div>';
+    if (S.notes.length) {
+      h += '<div class="card tight" style="padding:6px 14px">';
+      S.notes.slice(0, 3).forEach(function (n) {
+        const d = new Date(n.createdAt);
+        h += '<div class="note-row" data-act="openNote" data-id="' + n.id + '">' +
+          '<div class="note-dot"></div>' +
+          '<div style="flex:1;min-width:0">' +
+          '<div class="note-title">' + U.esc(n.title) + '</div>' +
+          '<div class="note-meta">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '/' + d.getDate() + '</div>' +
+          '</div></div>';
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="card" style="padding:14px 16px"><div class="tiny muted" style="line-height:1.65">把课堂板书、课件、作业截图丢进上面的相册，选「整理成笔记」，它会读懂内容、写好提纲，并按课程分好类。</div></div>';
+    }
 
     // 5. 课表
     h += '<div class="sec-title">课表</div>';
@@ -738,6 +756,63 @@
   window.render = render;
 
   /* ---------------- 时间轴 / 日历交互 ---------------- */
+  /* ---------------- 笔记 ---------------- */
+  function openNotes() {
+    if (document.getElementById('notesLayer')) return;
+    const layer = document.createElement('div');
+    layer.id = 'notesLayer';
+    layer.className = 'search-layer notes-layer';
+    const groups = Store.notesByCourse();
+    let body = '';
+    if (!groups.length) {
+      body = '<div class="empty" style="padding:50px 20px">还没有笔记。<br>去 AI 页选几张图，点「整理成笔记」。</div>';
+    } else {
+      groups.forEach(function (g) {
+        body += '<div class="note-group-title">' + U.esc(g.course) + ' <span>' + g.items.length + '</span></div>';
+        g.items.forEach(function (n) {
+          const d = new Date(n.createdAt);
+          body += '<div class="note-card" data-act="openNote" data-id="' + n.id + '">' +
+            '<div class="note-card-head"><span class="chip gray">' + U.esc(n.kind) + '</span>' +
+            '<span class="tiny muted">' + (d.getMonth() + 1) + '月' + d.getDate() + '日</span></div>' +
+            '<div class="note-title">' + U.esc(n.title) + '</div>' +
+            '<div class="note-preview">' + U.esc(String(n.content || n.raw).slice(0, 70)) + '</div>' +
+            (n.key && n.key.length ? '<div class="note-keys">' + n.key.map(function (k) { return '<span>' + U.esc(k) + '</span>'; }).join('') + '</div>' : '') +
+            '</div>';
+        });
+      });
+    }
+    layer.innerHTML = '<div class="search-head"><div class="notes-title">笔记</div>' +
+      '<button class="search-cancel" data-act="closeNotes">完成</button></div>' +
+      '<div class="search-body">' + body + '</div>';
+    document.body.appendChild(layer);
+    requestAnimationFrame(function () { layer.classList.add('on'); });
+  }
+
+  function closeNotes() {
+    const layer = document.getElementById('notesLayer');
+    if (!layer) return;
+    layer.classList.remove('on');
+    setTimeout(function () { layer.remove(); }, 260);
+  }
+
+  function openNote(id) {
+    const n = S.notes.find(function (x) { return x.id === id; });
+    if (!n) return;
+    const d = new Date(n.createdAt);
+    let h = '<h2>' + U.esc(n.title) + '</h2>';
+    h += '<p class="sh-sub">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '月' + d.getDate() + '日</p>';
+    if (n.thumb) h += '<img src="' + n.thumb + '" style="width:100%;border-radius:14px;margin-bottom:12px;display:block" alt="">';
+    if (n.content) h += '<div class="note-body">' + U.esc(n.content) + '</div>';
+    if (n.key && n.key.length) h += '<div class="note-keys" style="margin-top:12px">' + n.key.map(function (k) { return '<span>' + U.esc(k) + '</span>'; }).join('') + '</div>';
+    if (n.raw) {
+      h += '<div class="sec-title" style="margin-top:18px">原文</div>';
+      h += '<div class="card tight" style="font-size:12.5px;line-height:1.7;color:var(--text-2);white-space:pre-wrap">' + U.esc(n.raw) + '</div>';
+    }
+    h += '<div class="btn-row" style="margin-top:14px"><button class="btn" data-act="closeSheet">关闭</button>' +
+      '<button class="btn ghost danger" data-act="delNote" data-id="' + n.id + '">删除</button></div>';
+    openSheet(h);
+  }
+
   /* ---------------- 全局搜索 ---------------- */
   function searchAll(kw) {
     const k = String(kw || '').trim().toLowerCase();
@@ -1311,6 +1386,13 @@
       case 'calToday': st.calBase = U.today(); st.sel = U.today(); render(); break;
       case 'calSelect': st.sel = day; render(); break;
       case 'openSearch': openSearch(); break;
+      case 'openNotes': openNotes(); break;
+      case 'closeNotes': closeNotes(); break;
+      case 'openNote': openNote(id); break;
+      case 'delNote':
+        S.notes = S.notes.filter(function (x) { return x.id !== id; });
+        Store.save(); closeSheet(); closeNotes(); toast('已删除'); render(true);
+        break;
       case 'closeSearch': closeSearch(); break;
       case 'searchPick': {
         const inp = document.getElementById('searchInput');
@@ -1398,7 +1480,7 @@
         st.ai.imgs.splice(i, 1); render(); break;
       }
       case 'clearImg': st.ai.imgs = []; render(); break;
-      case 'aiVision': runVision(); break;
+      case 'aiVision': runVision(el.getAttribute('data-mode') || 'plan'); break;
       case 'aiBrief': runBrief(); break;
       case 'openAI': sheetAI(); break;
       case 'saveAI': saveAISettings(); break;
@@ -1806,16 +1888,29 @@
     } finally { st.ai.busy = false; }
   }
 
-  async function runVision() {
+  async function runVision(mode) {
     if (!st.ai.imgs.length) return;
     if (!AI.visionReady()) {
       toast('先配一个视觉模型（我的 → AI 接口）', 3200);
       return;
     }
     st.ai.visionBusy = true; render(true);
-    toast('正在读图…', 20000);
+    toast(mode === 'note' ? '正在读图写笔记…' : '正在读图…', 25000);
     try {
-      const res = await AI.analyzeImages(st.ai.imgs);
+      const res = await AI.analyzeImages(st.ai.imgs, mode);
+      if (mode === 'note') {
+        const n = res.note || {};
+        if (!n.content && !n.raw) { toast('图里没读出内容'); return; }
+        Store.addNote({
+          title: n.title, course: n.course, kind: n.kind,
+          content: n.content, raw: n.raw, key: n.key,
+          thumb: st.ai.imgs[0] || ''
+        });
+        st.ai.imgs = [];
+        render();
+        toast('笔记已保存到「' + (n.course || '未分类') + '」', 3200);
+        return;
+      }
       st.ai.last = res;
       st.ai.imgs = [];
       render();

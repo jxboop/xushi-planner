@@ -196,6 +196,7 @@
       grades: [],
       reviews: [],
       focus: [],
+      notes: [],
       chats: [],
       journals: []
     };
@@ -230,7 +231,7 @@
     const base = seed();
     const s = Object.assign({}, base, data || {});
     s.settings = Object.assign({}, DEFAULT_SETTINGS, (data && data.settings) || {});
-    ['events', 'todos', 'courses', 'links', 'inbox', 'drafts', 'goals', 'ddls', 'grades', 'reviews', 'focus', 'chats', 'journals'].forEach((k) => {
+    ['events', 'todos', 'courses', 'links', 'inbox', 'drafts', 'goals', 'ddls', 'grades', 'reviews', 'focus', 'notes', 'chats', 'journals'].forEach((k) => {
       if (!Array.isArray(s[k])) s[k] = base[k] || [];
     });
     return s;
@@ -685,6 +686,29 @@
     return out;
   }
 
+  /** 加一则笔记 */
+  function addNote(o) {
+    const n = Object.assign({
+      id: U.uid(), title: '未命名', course: '未分类', kind: '其他',
+      content: '', raw: '', key: [], thumb: '', createdAt: Date.now()
+    }, o || {});
+    S.notes.unshift(n);
+    if (S.notes.length > 300) S.notes.length = 300;
+    save();
+    return n;
+  }
+
+  /** 笔记按课程分组 */
+  function notesByCourse() {
+    const map = {};
+    S.notes.forEach(function (n) {
+      const c = n.course || '未分类';
+      (map[c] = map[c] || []).push(n);
+    });
+    return Object.keys(map).map(function (c) { return { course: c, items: map[c] }; })
+      .sort(function (a, b) { return b.items.length - a.items.length; });
+  }
+
   /* ---------------- 统计 ---------------- */
   function stats() {
     const t = U.today();
@@ -702,7 +726,7 @@
   window.S = S;
   window.Store = {
     save, seed, DEFAULT_SETTINGS, DEFAULT_PERIODS,
-    applyBuiltin, BUILTIN_COURSES, coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
+    applyBuiltin, BUILTIN_COURSES, addNote, notesByCourse, coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
     addEvent: Api.addEvent, addTodo: Api.addTodo, delItem: Api.delItem,
     toggleItem: Api.toggleItem, commit: Api.commit,
     buildICS, compress, stats, parseTimetableLines,

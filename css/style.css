@@ -813,3 +813,35 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
 /* ---------- DDL 阶段进度 ---------- */
 .step-bar{height:4px;border-radius:4px;background:var(--line);margin-top:7px;overflow:hidden}
 .step-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .45s cubic-bezier(.3,.8,.3,1)}
+
+/* ---------- 笔记 ---------- */
+.note-row{display:flex;gap:11px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.note-row:last-child{border-bottom:0}
+.note-dot{width:8px;height:8px;border-radius:3px;background:linear-gradient(135deg,var(--accent),var(--accent-2));flex:0 0 auto}
+.note-title{font-size:14.5px;font-weight:600;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note-meta{font-size:11.5px;color:var(--text-3);margin-top:2px}
+
+.notes-title{flex:1;font-size:20px;font-weight:700;letter-spacing:-.03em}
+.note-group-title{
+  font-size:12.5px;font-weight:700;color:var(--text-2);margin:18px 2px 9px;
+  display:flex;align-items:center;gap:7px;
+}
+.note-group-title span{
+  font-size:10.5px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);
+  padding:1px 7px;border-radius:99px;
+}
+.note-card{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:13px 14px;margin-bottom:9px;box-shadow:var(--shadow-card);
+}
+.note-card:active{background:var(--accent-soft)}
+.note-card-head{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.note-card-head .tiny{margin-left:auto}
+.note-preview{font-size:12.5px;color:var(--text-2);margin-top:5px;line-height:1.55;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.note-keys{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.note-keys span{font-size:11px;color:var(--text-2);background:var(--bg);border:1px solid var(--line);padding:2px 8px;border-radius:99px}
+.note-body{
+  font-size:15px;line-height:1.78;white-space:pre-wrap;letter-spacing:-.005em;
+  background:var(--card-2);border:1px solid var(--line);border-radius:14px;padding:14px;
+}

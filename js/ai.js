@@ -150,6 +150,33 @@
     return ps.map((p, i) => '  第' + (i + 1) + '节 ' + p[0] + '-' + p[1]).join('\n');
   }
 
+  const SYS_NOTE = function () {
+    const list = (S.courses || []).map(function (c) { return c.name; });
+    const uniq = [];
+    list.forEach(function (n) { if (uniq.indexOf(n) < 0) uniq.push(n); });
+    return [
+      '你是「序时」App 的学习笔记助手，服务对象是中国大学生（电子科技大学大一）。',
+      nowLine(),
+      '用户会发来相册里的图片：课堂板书、PPT 课件、作业要求、教务通知、群聊记录、教材拍照。',
+      '请读懂内容，整理成一则**可以直接复习的笔记**，并判断它属于哪门课。',
+      '',
+      '用户这学期在上的课（course 必须从这里选，对不上就填「未分类」）：',
+      uniq.length ? uniq.map(function (n) { return '- ' + n; }).join(String.fromCharCode(10)) : '- （暂未导入课表）',
+      '',
+      '只输出一个 JSON 对象，不要解释、不要 markdown 代码块：',
+      '{"course":"课程名","title":"笔记标题（≤16字）","kind":"板书|课件|作业|通知|其他",',
+      ' "content":"整理后的笔记正文：分点写，公式和数字原样保留，≤400 字",',
+      ' "key":["3-5 个关键词"],"raw":"图里的关键原文，≤300 字"}',
+      '规则：',
+      '1. content 是给人复习用的，不是流水账：先写这页在讲什么，再列要点。',
+      '2. 有公式、定义、定理、代码，原样保留不要改写。',
+      '3. 图片是作业要求时，kind 填「作业」，content 里写清楚要求和截止时间。',
+      '4. 完全不认识的课，course 填「未分类」，不要瞎猜。',
+      '5. 看不清的地方写「（图不清）」，不要编。',
+      '6. 多张图是同一门课的内容就合并成一则笔记。'
+    ].join(String.fromCharCode(10));
+  };
+
   const SYS_COURSE = function () {
     const sem = S.settings.semesterStart || '（未设置）';
     return [
@@ -212,11 +239,12 @@
     return normalize(j);
   }
 
-  async function analyzeImages(dataUrls) {
-    const content = [{ type: 'text', text: '请整理这些图片，最多挑最重要的 6 条，合并重复内容。' }];
+  async function analyzeImages(dataUrls, mode) {
+    const isNote = mode === 'note';
+    const content = [{ type: 'text', text: isNote ? '把这些图整理成一则笔记。' : '请整理这些图片，最多挑最重要的 6 条，合并重复内容。' }];
     dataUrls.slice(0, 6).forEach((u) => content.push({ type: 'image_url', image_url: { url: u } }));
     const s = S.settings;
-    const r = await raw([{ role: 'system', content: SYS_VISION() }, { role: 'user', content: content }], {
+    const r = await raw([{ role: 'system', content: isNote ? SYS_NOTE() : SYS_VISION() }, { role: 'user', content: content }], {
       json: true,
       temperature: 0.2,
       base: s.visionBase || s.apiBase,
@@ -225,6 +253,18 @@
       maxTokens: IS_REASONER(s.visionModel) ? 4000 : 2400
     });
     const j = pickJSON(r.text) || {};
+    if (isNote) {
+      return {
+        note: {
+          course: String(j.course || '未分类').trim().slice(0, 20),
+          title: String(j.title || '未命名笔记').trim().slice(0, 24),
+          kind: String(j.kind || '其他').trim().slice(0, 6),
+          content: String(j.content || '').trim().slice(0, 900),
+          key: Array.isArray(j.key) ? j.key.slice(0, 6).map(function (x) { return String(x).slice(0, 12); }) : [],
+          raw: String(j.raw || '').trim().slice(0, 600)
+        }
+      };
+    }
     return normalize(j, { keepText: true });
   }
 
