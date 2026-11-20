@@ -201,6 +201,26 @@
     };
   }
 
+  /* ---------------- 内置课表（2026 秋 · 本科 · 由教务系统导入） ---------------- */
+  const BUILTIN_COURSES = [
+    { name: "人类文明经典赏析", place: "品学楼C411", day: 1, periods: [1, 2], weeks: '3-10' },
+    { name: "军事理论", place: "品学楼B412", day: 1, periods: [3, 4], weeks: '3-10' },
+    { name: "微积分Ⅰ", place: "品学楼A303", day: 1, periods: [5, 6], weeks: '3-18' },
+    { name: "线性代数与空间解析几何Ⅰ", place: "品学楼A411", day: 2, periods: [3, 4], weeks: '3-18' },
+    { name: "物联天下，传感先行－传感器导论", place: "品学楼C411", day: 2, periods: [5, 6], weeks: '3-10' },
+    { name: "羽毛球A", place: "", day: 2, periods: [7, 8], weeks: '3-18' },
+    { name: "习近平新时代中国特色社会主义思想概论", place: "品学楼B311", day: 3, periods: [1, 2], weeks: '3-15' },
+    { name: "微积分Ⅰ", place: "品学楼A303", day: 3, periods: [3, 4], weeks: '3-18' },
+    { name: "通用英语（提高）", place: "品学楼C220", day: 3, periods: [5, 6], weeks: '3-18' },
+    { name: "微积分Ⅰ", place: "品学楼A303", day: 3, periods: [7, 8], weeks: '15-17' },
+    { name: "线性代数与空间解析几何Ⅰ", place: "品学楼A411", day: 4, periods: [1, 2], weeks: '3-4,6-18' },
+    { name: "心理健康与创新能力", place: "品学楼A203", day: 4, periods: [9, 10], weeks: '3-4,6-13' },
+    { name: "微积分Ⅰ", place: "品学楼A303", day: 5, periods: [1, 2], weeks: '3,6-17' },
+    { name: "习近平新时代中国特色社会主义思想概论", place: "品学楼B311", day: 5, periods: [3, 4], weeks: '3,6-15' },
+    { name: "心理健康与创新能力", place: "", day: 7, periods: [9], weeks: '2-13' },
+  ];
+  const BUILTIN_SEMESTER = '2026-09-07'; // 第 1 周周一，推算值，可在「我的 → 学期开始」改
+
   /* ---------------- 载入 / 保存 ---------------- */
   function load() {
     let raw = null;
@@ -229,6 +249,29 @@
         if (window.toast) window.toast('本地空间快满了，已清理图片缩略图');
       }
     }
+  }
+
+  /** 首次打开时把内置课表灌进去（已经有同名同时间的就跳过） */
+  function applyBuiltin() {
+    if (S.settings.builtinApplied) return false;
+    S.settings.builtinApplied = true;
+    const seen = {};
+    S.courses.forEach(function (c) { seen[c.name + '|' + c.day + '|' + (c.periods || []).join(',')] = 1; });
+    let added = 0;
+    BUILTIN_COURSES.forEach(function (c) {
+      const k = c.name + '|' + c.day + '|' + c.periods.join(',');
+      if (seen[k]) return;
+      seen[k] = 1;
+      S.courses.push({
+        id: U.uid(), name: c.name, teacher: '', place: c.place,
+        day: c.day, periods: c.periods, weeks: c.weeks,
+        start: '', end: '', color: ''
+      });
+      added++;
+    });
+    if (!S.settings.semesterStart) S.settings.semesterStart = BUILTIN_SEMESTER;
+    save();
+    return added > 0;
   }
 
   /* ---------------- 课表 → 当日课程 ---------------- */
@@ -659,7 +702,7 @@
   window.S = S;
   window.Store = {
     save, seed, DEFAULT_SETTINGS, DEFAULT_PERIODS,
-    coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
+    applyBuiltin, BUILTIN_COURSES, coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
     addEvent: Api.addEvent, addTodo: Api.addTodo, delItem: Api.delItem,
     toggleItem: Api.toggleItem, commit: Api.commit,
     buildICS, compress, stats, parseTimetableLines,

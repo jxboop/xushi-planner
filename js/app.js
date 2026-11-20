@@ -1748,6 +1748,7 @@
   /* ---------------- 启动 ---------------- */
   function boot() {
     applyTheme();
+    try { Store.applyBuiltin(); } catch (e) {}   // 内置课表（只跑一次）
     Store.save(); // 首次种子也落盘，避免刷新后 uid 变化
     const hash = (location.hash || '').replace('#', '').split(/[&?]/)[0];
     if (hash === 'week') { st.page = 'calendar'; st.calMode = 'week'; }
