@@ -404,7 +404,7 @@
       S.events.push(ev); save(); return ev;
     },
     addTodo(o) {
-      const td = Object.assign({ id: U.uid(), title: '', date: '', done: false, prio: 0, tag: '', createdAt: Date.now() }, o);
+      const td = Object.assign({ id: U.uid(), title: '', date: '', done: false, prio: 0, tag: '', note: '', createdAt: Date.now() }, o);
       S.todos.push(td); save(); return td;
     },
     delItem(kind, id) {

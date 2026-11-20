@@ -43,7 +43,18 @@
   };
   const ARW = '<svg class="arw" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.6l6.4 6.4-6.4 6.4"/></svg>';
   const TAGS = ['课程', '作业', '考试', '实验', '会议', '社团', '复习', '生活', '其他'];
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.7.0';
+
+  /* 标签配色：一眼分清作业/考试/实验 */
+  const TAG_COLORS = {
+    '课程': '#3B6CFF', '作业': '#F59E0B', '考试': '#EF4444', '实验': '#8B5CF6',
+    '会议': '#0EA5E9', '社团': '#EC4899', '复习': '#10B981', '生活': '#64748B', '其他': '#94A3B8'
+  };
+  function tagChip(tag) {
+    if (!tag) return '';
+    const c = TAG_COLORS[tag] || '#94A3B8';
+    return '<span class="chip" style="background:' + c + '1F;color:' + c + '">' + U.esc(tag) + '</span>';
+  }
 
   /* 常见 App 的 URL Scheme：入口填了就先唤起 App，失败再回退网页 */
   const APP_SCHEMES = {
@@ -159,7 +170,7 @@
     const chips = [];
     if (isCourse) chips.push('<span class="chip purple">' + U.esc(it.periodText || '课程') + '</span>');
     if (it.place) chips.push('<span class="chip gray">' + U.esc(it.place) + '</span>');
-    if (it.tag) chips.push('<span class="chip">' + U.esc(it.tag) + '</span>');
+    if (it.tag) chips.push(tagChip(it.tag));
     if (it.prio === 2) chips.push('<span class="chip warn">紧急</span>');
     if (it.prio === 1) chips.push('<span class="chip warn">重要</span>');
     const note = it.note ? '<div class="ev-note">' + U.esc(it.note) + '</div>' : '';
@@ -736,8 +747,8 @@
       }
     });
     S.todos.forEach(function (t) {
-      if (hit(t.title)) {
-        out.push({ type: '待办', title: t.title, meta: t.date ? U.relLabel(t.date) : '未排期', act: 'open', kind: 'todo', id: t.id });
+      if (hit(t.title) || hit(t.note)) {
+        out.push({ type: '待办', title: t.title, meta: (t.date ? U.relLabel(t.date) : '未排期') + (t.note ? ' · ' + String(t.note).slice(0, 26) : ''), act: 'open', kind: 'todo', id: t.id });
       }
     });
     S.courses.forEach(function (c) {
@@ -915,6 +926,7 @@
       h += '<div class="field"><label>地点</label><input name="place" value="' + U.esc(d.place || '') + '" placeholder="品学楼 A203"></div>';
     } else {
       h += '<div class="field"><label>优先级</label><select name="prio"><option value="0"' + (d.prio === 0 ? ' selected' : '') + '>普通</option><option value="1"' + (d.prio === 1 ? ' selected' : '') + '>重要</option><option value="2"' + (d.prio === 2 ? ' selected' : '') + '>紧急</option></select></div>';
+      h += '<div class="field"><label>作业要求 / 备注</label><textarea name="note" placeholder="把群里那段要求整段贴进来，以后就不用翻聊天记录">' + U.esc(d.note || '') + '</textarea></div>';
     }
     h += '<div class="field"><label>标签</label><select name="tag"><option value="">不标</option>' + TAGS.map((t) => '<option' + (d.tag === t ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>';
     if (!isTodo) h += '<div class="field"><label>备注</label><textarea name="note" placeholder="要带的东西、要点、链接…">' + U.esc(d.note || '') + '</textarea></div>';
@@ -1612,8 +1624,8 @@
         if (!title) { toast('写个标题'); return; }
         if (kind === 'todo') {
           let it = S.todos.find((x) => x.id === id);
-          if (it) { Object.assign(it, { title, date: get('date'), prio: +get('prio') || 0, tag: get('tag') }); }
-          else Store.addTodo({ title, date: get('date'), prio: +get('prio') || 0, tag: get('tag') });
+          if (it) { Object.assign(it, { title, date: get('date'), prio: +get('prio') || 0, tag: get('tag'), note: get('note') }); }
+          else Store.addTodo({ title, date: get('date'), prio: +get('prio') || 0, tag: get('tag'), note: get('note') });
         } else {
           let it = S.events.find((x) => x.id === id);
           const patch = { title, date: get('date') || U.today(), start: get('start'), end: get('end'), place: get('place'), note: get('note'), tag: get('tag') };
