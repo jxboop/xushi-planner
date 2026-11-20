@@ -1751,6 +1751,20 @@
     try { Store.applyBuiltin(); } catch (e) {}   // 内置课表（只跑一次）
     Store.save(); // 首次种子也落盘，避免刷新后 uid 变化
     const hash = (location.hash || '').replace('#', '').split(/[&?]/)[0];
+
+    // #cfg=xxx：一次性配置链接（把 AI 接口参数写进本地，不落在代码里）
+    if (hash.indexOf('cfg=') === 0) {
+      try {
+        const raw = decodeURIComponent(hash.slice(4));
+        const obj = JSON.parse(decodeURIComponent(escape(atob(raw))));
+        Object.keys(obj).forEach(function (k) { if (k in S.settings) S.settings[k] = obj[k]; });
+        Store.save();
+        try { history.replaceState(null, '', location.pathname); } catch (e) {}
+        setTimeout(function () { toast('AI 配置已写入，去「我的」看看', 3600); }, 900);
+      } catch (e) {
+        setTimeout(function () { toast('配置链接无效'); }, 900);
+      }
+    }
     if (hash === 'week') { st.page = 'calendar'; st.calMode = 'week'; }
     else if (PAGES[hash]) st.page = hash;
     else if (hash === 'new') st.page = 'today';
