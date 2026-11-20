@@ -21,9 +21,19 @@ iOS 不允许随便装 App Store 以外的 App，**必须签名**。两条路：
 
 ---
 
-## 第一步：让 GitHub 帮你编译出 .ipa
+## 第一步：拿到 .ipa
 
-### 1. 注册并建仓库
+**已经帮你编好了。** 文件在 `build/Xushi-1.0-unsigned.ipa`（1 MB，arm64，iOS 13+）。
+直接用就行，跳到第二步。
+
+> 想自己重新编一次（改了代码之后）：仓库已经建好在
+> <https://github.com/jxboop/xushi-planner>（私有）。
+> 推代码上去就会自动编译，或者到 Actions 页面点 **Run workflow**，
+> 跑完在 Artifacts 里下 `Xushi-unsigned-ipa`。
+
+### 如果你想从零自己来
+
+#### 1. 注册并建仓库
 1. 打开 <https://github.com> 注册（免费，不用信用卡）
 2. 右上角 **+** → **New repository**
 3. 名字随便，比如 `xushi`，选 **Private**（私有，别人看不到）→ Create

@@ -153,6 +153,7 @@
     theme: 'auto',
     periods: DEFAULT_PERIODS,
     briefTime: '08:00',
+    reasoning: false,
     gpaMode: 'level',
     targetGpa: '3.7',
     focusLen: 25,
@@ -275,7 +276,7 @@
     const dow = ((U.toDate(dayStr).getDay() + 6) % 7) + 1; // 周一=1
     return S.courses.filter((c) => Number(c.day) === dow && weeksInclude(c.weeks, w)
       && (!c.weeks || weeksInclude(c.weeks, w))).map((c) => {
-      const sp = periodSpan(c.periods);
+      const sp = (c.start && c.end) ? { start: c.start, end: c.end } : periodSpan(c.periods);
       const p = (c.periods || []).slice().sort((x, y) => x - y);
       return {
         id: 'c-' + c.id + '-' + dayStr,

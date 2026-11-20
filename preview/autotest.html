@@ -210,6 +210,28 @@ f.onload = async () => {
     check('新字段都落盘', ['ddls', 'grades', 'reviews', 'focus'].every((k) => Array.isArray(w.S[k])),
       ['ddls', 'grades', 'reviews', 'focus'].map((k) => k + ':' + (Array.isArray(w.S[k]) ? w.S[k].length : 'X')).join(' '));
 
+    /* 19. App Scheme 与深度思考 */
+    check('深度思考默认关闭', w.S.settings.reasoning === false);
+    await click('[data-act="go"][data-page="links"]', 240);
+    await click('[data-act="linkEdit"]', 280);
+    check('入口表单含 App 链接字段', !!q('[name="scheme"]'));
+    if (q('[name="url"]') && q('[name="scheme"]')) {
+      q('[name="url"]').value = 'bilibili.com';
+      q('[name="url"]').dispatchEvent(new w.Event('input', { bubbles: true }));
+      await sleep(120);
+    }
+    check('填网址自动猜出 scheme', (q('[name="scheme"]') || {}).value === 'bilibili://', (q('[name="scheme"]') || {}).value);
+    await click('[data-act="closeSheet"]', 200);
+    await click('[data-act="go"][data-page="me"]', 220);
+    await click('[data-act="openAI"]', 260);
+    w.S.settings.reasoning = true; w.Store.save();
+    await click('[data-act="go"][data-page="me"]', 220);
+    await click('[data-act="openAI"]', 260);
+    check('AI 面板有深度思考开关', !!q('[data-act="toggleReasoning"]'));
+    await click('[data-act="toggleReasoning"]', 260);
+    check('开关可切换', w.S.settings.reasoning === false);
+    await click('[data-act="closeSheet"]', 200);
+
     check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));
   } catch (e) {
     check('测试脚本异常', false, e.message + ' @ ' + (e.stack || '').split('\n')[1]);

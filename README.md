@@ -9,7 +9,7 @@
   <img src="preview/s-me-full.png" width="200">
 </p>
 <p>
-  <img src="preview/all-light.png" width="640">
+  <img src="preview/all-light.png" width="840">
 </p>
 
 ---
@@ -58,12 +58,13 @@
 - **目标**：绩点、竞赛、实验室这种长期的东西单独记着
 - **备份 / 恢复**：一键导出 JSON
 - **深色模式**：跟随系统，也可以手动锁定
+- **维护页**（底栏第 6 个）：版本 / 数据占用 / 条目统计、备份恢复、运行日志、存储配额、AI 连通测试、强制刷新 —— 自己用的时候排查问题都在这一页
 
 ---
 
-> **想要桌面上那种真 App（不用先开 Safari）？** 见 [INSTALL-iOS.md](INSTALL-iOS.md)：
-> 项目里已经放好了 iOS 原生工程和 GitHub Actions 配置，点一下就能编译出 `.ipa`，
-> 再用免费的 Apple ID 签名装进手机。代价是每 7 天重签一次（30 秒）。
+> **想要桌面上那种真 App（不用先开 Safari）？**
+> `.ipa` 已经编译好了：`build/Xushi-1.0-unsigned.ipa`（未签名，用 Sideloadly + 免费 Apple ID 装）。
+> 完整步骤见 [INSTALL-iOS.md](INSTALL-iOS.md)。代价是每 7 天重签一次（30 秒）。
 
 ## 三、五分钟装到 iPhone 上
 
@@ -238,6 +239,8 @@ DeepSeek 目前只有文本模型，读图要另配一个视觉模型（都兼�
 ├── native/                 iOS 原生工程（Capacitor 封装，含图标 / 权限 / 插件）
 ├── .github/workflows/      GitHub Actions：点一下自动编译出 .ipa
 ├── INSTALL-iOS.md          装成真 App 的完整步骤（侧载 / 签名 / 7 天重签）
+├── SIGN.md                 签名安装的一页纸（已经编好 ipa，照着点就行）
+├── build/                  编译产物：Xushi-1.0-unsigned.ipa
 ├── optional-functions/     可选：给站点加一道口令
 ├── make-icons.py           图标生成脚本（要改配色/图形就改这个再跑一次）
 └── preview/                截图与自检页（部署时可以不传）

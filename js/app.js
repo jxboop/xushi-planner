@@ -42,7 +42,42 @@
   };
   const ARW = '<svg class="arw" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.6l6.4 6.4-6.4 6.4"/></svg>';
   const TAGS = ['课程', '作业', '考试', '实验', '会议', '社团', '复习', '生活', '其他'];
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.3.0';
+
+  /* 常见 App 的 URL Scheme：入口填了就先唤起 App，失败再回退网页 */
+  const APP_SCHEMES = {
+    'bilibili.com': 'bilibili://',
+    'zhihu.com': 'zhihu://',
+    'weibo.com': 'sinaweibo://',
+    'xiaohongshu.com': 'xhsdiscover://',
+    'douyin.com': 'snssdk1128://',
+    'taobao.com': 'taobao://',
+    'tmall.com': 'taobao://',
+    'alipay.com': 'alipays://',
+    'weixin.qq.com': 'weixin://',
+    'qq.com': 'mqq://',
+    '163.com': 'orpheus://',
+    'notion.so': 'notion://',
+    'chaoxing.com': 'chaoxingmobile://',
+    'dingtalk.com': 'dingtalk://',
+    'feishu.cn': 'lark://',
+    'amap.com': 'iosamap://',
+    'meituan.com': 'imeituan://',
+    'linkedin.com': 'linkedin://'
+  };
+  function guessScheme(url) {
+    let raw = String(url || '').trim();
+    if (!raw) return '';
+    if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+    try {
+      const h = new URL(raw).hostname.replace(/^www\./, '');
+      const keys = Object.keys(APP_SCHEMES);
+      for (let i = 0; i < keys.length; i++) {
+        if (h === keys[i] || h.endsWith('.' + keys[i])) return APP_SCHEMES[keys[i]];
+      }
+    } catch (e) {}
+    return '';
+  }
 
   const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
@@ -607,6 +642,48 @@
   window.render = render;
 
   /* ---------------- 时间轴 / 日历交互 ---------------- */
+  function openLinkEdit(id) {
+    const l = id ? S.links.find((x) => x.id === id) : { title: '', url: '', group: '常用', color: '' };
+    if (!l) return;
+    let h2 = '<h2>' + (id ? '编辑入口' : '添加入口') + '</h2>';
+    h2 += '<form id="linkForm" data-id="' + (id || '') + '">';
+    h2 += '<div class="field"><label>名称</label><input name="title" value="' + U.esc(l.title) + '" placeholder="教务处"></div>';
+    h2 += '<div class="field"><label>网址</label><input name="url" value="' + U.esc(l.url) + '" placeholder="https://jwc.uestc.edu.cn" inputmode="url" spellcheck="false"></div>';
+    h2 += '<div class="field"><label>分组</label><input name="group" value="' + U.esc(l.group || '常用') + '" placeholder="校园 / 常用 / 学习"></div>';
+    h2 += '<div class="field"><label>App 链接（可选）</label><input name="scheme" value="' + U.esc(l.scheme || guessScheme(l.url || '')) + '" placeholder="bilibili://" spellcheck="false" autocapitalize="off"><div class="hint">填了就优先唤起手机上的 App，打不开再回到网页。常见 App 会自动猜。</div></div>';
+    h2 += '<div class="btn-row"><button class="btn primary" type="submit">保存</button></div>';
+    if (id) h2 += '<button class="btn block ghost danger" type="button" style="margin-top:10px" data-act="linkDel" data-id="' + id + '">删除</button>';
+    h2 += '</form>';
+    openSheet(h2);
+
+    // 输入网址时自动补 App 链接
+    const urlInp = sheetEl.querySelector('[name="url"]');
+    const schInp = sheetEl.querySelector('[name="scheme"]');
+    if (urlInp && schInp) {
+      urlInp.addEventListener('input', function () {
+        if (schInp.value.trim()) return;
+        const g = guessScheme(urlInp.value);
+        if (g) schInp.value = g;
+      });
+    }
+  }
+
+  function launchScheme(scheme, fallback) {
+    let jumped = false;
+    const onVis = () => { if (document.hidden) jumped = true; };
+    document.addEventListener('visibilitychange', onVis);
+    const a = document.createElement('a');
+    a.href = scheme;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    try { a.click(); } catch (e) {}
+    setTimeout(() => {
+      document.removeEventListener('visibilitychange', onVis);
+      a.remove();
+      if (!jumped && !document.hidden && fallback) openExternal(fallback);
+    }, 2000);
+  }
+
   function openExternal(url) {
     const cap = window.Capacitor;
     if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Browser) {
@@ -662,7 +739,10 @@
     h += '<div class="field"><label>接口地址</label><input name="apiBase" value="' + U.esc(s.apiBase) + '" placeholder="https://api.deepseek.com" spellcheck="false"><div class="hint">任何 OpenAI 兼容端点都行：https://api.deepseek.com、https://api.moonshot.cn/v1、自建 Ollama…</div></div>';
     h += '<div class="field"><label>模型</label><input name="model" value="' + U.esc(s.model) + '" placeholder="deepseek-chat"></div>';
     h += '<div class="field"><label>代理地址（可选）</label><input name="proxyBase" value="' + U.esc(s.proxyBase) + '" placeholder="https://xxx.workers.dev/proxy" spellcheck="false"><div class="hint">部署 worker/worker.js 后填它的 URL，用来绕过浏览器跨域限制。</div></div>';
-    h += '<div class="hr"></div><div class="field"><label>视觉模型（相册读图用）</label><input name="visionModel" value="' + U.esc(s.visionModel) + '" placeholder="glm-4v-flash"></div>';
+    h += '<div class="hr"></div>';
+    h += '<div class="row" style="padding:0 0 12px;border:0"><div class="lbl" style="font-size:14px">深度思考<small>课表、复杂文本走 deepseek-reasoner，慢 20–60 秒但更准</small></div>' +
+      '<div class="switch ' + (s.reasoning ? 'on' : '') + '" data-act="toggleReasoning"><i></i></div></div>';
+    h += '<div class="field"><label>视觉模型（相册读图用）</label><input name="visionModel" value="' + U.esc(s.visionModel) + '" placeholder="glm-4v-flash"></div>';
     h += '<div class="field"><label>视觉接口地址</label><input name="visionBase" value="' + U.esc(s.visionBase) + '" placeholder="https://open.bigmodel.cn/api/paas/v4" spellcheck="false"></div>';
     h += '<div class="field"><label>视觉模型 Key</label><input name="visionKey" value="' + U.esc(s.visionKey) + '" placeholder="留空则复用上面的 Key" autocomplete="off" spellcheck="false"><div class="hint">DeepSeek 目前没有图片理解，读图需要另配一个视觉模型（智谱 glm-4v-flash 免费、通义 qwen-vl 等，都兼容这个格式）。</div></div>';
     h += '<div class="btn-row"><button class="btn primary" data-act="saveAI">保存</button><button class="btn" data-act="testAI">测试连接</button></div>';
@@ -912,10 +992,28 @@
   }
   setInterval(tick, 1000);
 
+  /* 长按入口 → 编辑（入口页副标题写的就是「长按编辑」） */
+  let pressTimer = 0;
+  view.addEventListener('pointerdown', function (e) {
+    const lk = e.target.closest('.lk[data-id]');
+    if (!lk || !lk.getAttribute('data-id')) return;
+    const id = lk.getAttribute('data-id');
+    pressTimer = setTimeout(function () {
+      pressTimer = 0;
+      lk.dataset.lp = '1';
+      if (navigator.vibrate) navigator.vibrate(12);
+      openLinkEdit(id);
+    }, 550);
+  });
+  ['pointerup', 'pointercancel', 'pointermove', 'pointerleave'].forEach(function (t) {
+    view.addEventListener(t, function () { if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; } });
+  });
+
   /* ---------------- 事件委托 ---------------- */
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-act]');
     if (!el) return;
+    if (el.dataset && el.dataset.lp) { delete el.dataset.lp; return; }
     const act = el.getAttribute('data-act');
     const id = el.getAttribute('data-id') || '';
     const day = el.getAttribute('data-day') || '';
@@ -968,23 +1066,12 @@
         const l = S.links.find((x) => x.id === id);
         const target = l ? l.url : url;
         if (!target) break;
+        if (l && l.scheme) { launchScheme(l.scheme, target); break; }
         openExternal(target);
         break;
       }
-      case 'linkEdit': {
-        const l = id ? S.links.find((x) => x.id === id) : { title: '', url: '', group: '常用', color: '' };
-        if (!l) break;
-        let h2 = '<h2>' + (id ? '编辑入口' : '添加入口') + '</h2>';
-        h2 += '<form id="linkForm" data-id="' + (id || '') + '">';
-        h2 += '<div class="field"><label>名称</label><input name="title" value="' + U.esc(l.title) + '" placeholder="教务处"></div>';
-        h2 += '<div class="field"><label>网址</label><input name="url" value="' + U.esc(l.url) + '" placeholder="https://jwc.uestc.edu.cn" inputmode="url" spellcheck="false"></div>';
-        h2 += '<div class="field"><label>分组</label><input name="group" value="' + U.esc(l.group || '常用') + '" placeholder="校园 / 常用 / 学习"></div>';
-        h2 += '<div class="btn-row"><button class="btn primary" type="submit">保存</button></div>';
-        if (id) h2 += '<button class="btn block ghost danger" type="button" style="margin-top:10px" data-act="linkDel" data-id="' + id + '">删除</button>';
-        h2 += '</form>';
-        openSheet(h2);
-        break;
-      }
+      case 'linkEdit': openLinkEdit(id); break;
+
       case 'linkDel':
         S.links = S.links.filter((x) => x.id !== id); Store.save(); closeSheet(); toast('已删除'); render(true);
         break;
@@ -1041,10 +1128,25 @@
       case 'aiBrief': runBrief(); break;
       case 'openAI': sheetAI(); break;
       case 'saveAI': saveAISettings(); break;
+      case 'toggleReasoning':
+        S.settings.reasoning = !S.settings.reasoning;
+        Store.save();
+        sheetAI();
+        toast(S.settings.reasoning ? '深度思考已开：解析会更准，也更慢' : '已关闭深度思考');
+        break;
       case 'testAI': testAI(); break;
       case 'courseImport': sheetCourse(); break;
       case 'courseParse': runCourseParse(); break;
       case 'courseSave': saveCourses(); break;
+      case 'courseDrop': {
+        const i = +el.getAttribute('data-i');
+        if (courseDraft) {
+          courseDraft.splice(i, 1);
+          showCoursePreview(courseDraft, []);
+          if (!courseDraft.length) toast('都删完了，重新粘贴一次吧');
+        }
+        break;
+      }
       case 'courseDel':
         S.courses = S.courses.filter((c) => c.id !== id); Store.save(); toast('已删除'); render(true);
         break;
@@ -1261,7 +1363,7 @@
         const id = f.getAttribute('data-id');
         let url = get('url');
         if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-        const patch = { title: get('title') || U.host(url), url, group: get('group') || '常用' };
+        const patch = { title: get('title') || U.host(url), url, group: get('group') || '常用', scheme: get('scheme') };
         if (id) { const l = S.links.find((x) => x.id === id); if (l) Object.assign(l, patch); }
         else S.links.push(Object.assign({ id: U.uid() }, patch));
         Store.save(); closeSheet(); toast('已保存'); render(true);
@@ -1487,35 +1589,62 @@
     const sem = $('#courseSem');
     if (sem && sem.value) { S.settings.semesterStart = sem.value; Store.save(); }
     const box = $('#coursePreview');
-    if (box) box.innerHTML = '<div class="card tight" style="margin-top:12px"><div class="sk sk-line" style="width:60%"></div><div class="sk sk-line" style="width:85%"></div><div class="sk sk-line" style="width:40%"></div></div>';
+    if (box) {
+      box.innerHTML = '<div class="card tight" style="margin-top:12px">' +
+        '<div class="tiny muted" style="margin-bottom:8px">' + (S.settings.reasoning ? '深度思考中，可能要 20–60 秒…' : 'AI 正在读…') + '</div>' +
+        '<div class="sk sk-line" style="width:60%"></div><div class="sk sk-line" style="width:85%"></div><div class="sk sk-line" style="width:40%"></div></div>';
+    }
     try {
       if (!AI.ready()) throw new Error('需要先在「我的」配置 API Key 才能解析课表');
-      const list = await AI.parseCourses(text);
+      const res = await AI.parseCourses(text);
+      const list = res.courses || [];
       courseDraft = list;
-      if (!list.length) { toast('没解析出课程，检查一下文本格式'); return; }
-      let h = '<div class="card tight" style="margin-top:12px"><div class="tiny muted" style="margin-bottom:8px">识别到 ' + list.length + ' 条课程</div>';
-      list.forEach((c) => {
-        h += '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:13.5px">' +
-          '<span class="chip purple">周' + '一二三四五六日'[c.day - 1] + '</span>' +
-          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + U.esc(c.name) + '</span>' +
-          '<span class="tiny muted">' + (c.periods || []).join(',') + ' 节 · ' + U.esc(c.weeks) + '</span></div>';
-      });
-      h += '<div class="btn-row"><button class="btn primary" data-act="courseSave">确认导入</button></div></div>';
-      if (box) box.innerHTML = h;
+      if (!list.length) {
+        let msg = '<div class="card tight" style="margin-top:12px;font-size:13px"><b>没解析出课程</b>';
+        if (res.issues && res.issues.length) msg += '<div class="tiny muted" style="margin-top:6px">' + res.issues.map(U.esc).join('<br>') + '</div>';
+        msg += '<div class="tiny muted" style="margin-top:8px">试试：把课表复制成「课程名 周一 1-2节 教室 1-16周」这样的纯文本；或者先在「我的 → 学期开始」填好第 1 周周一。</div></div>';
+        if (box) box.innerHTML = msg;
+        toast('没解析出课程');
+        return;
+      }
+      showCoursePreview(list, res.issues);
     } catch (err) {
       if (box) box.innerHTML = '<div class="card tight" style="margin-top:12px;color:var(--danger);font-size:13px">' + U.esc(String(err.message || err)) + '</div>';
     }
   }
 
+  function showCoursePreview(list, issues) {
+    const box = $('#coursePreview');
+    if (!box) return;
+    let h = '<div class="card tight" style="margin-top:12px">';
+    h += '<div class="tiny muted" style="margin-bottom:8px">识别到 ' + list.length + ' 条 · 点 × 删掉不对的</div>';
+    list.forEach((c, i) => {
+      const t = (c.start && c.end) ? c.start + '–' + c.end
+        : (function () { const sp = Store.periodSpan(c.periods || []); return sp.start ? sp.start + '–' + sp.end : ''; })();
+      h += '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13.5px;border-bottom:1px solid var(--line)">' +
+        '<span class="chip purple">周' + '一二三四五六日'[c.day - 1] + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + U.esc(c.name) + '</div>' +
+        '<div class="tiny muted">' + (c.periods || []).join(',') + ' 节' + (t ? ' · ' + t : '') + (c.place ? ' · ' + U.esc(c.place) : '') + ' · ' + U.esc(c.weeks) + '</div></div>' +
+        '<button class="tiny" style="color:var(--danger);padding:4px 2px" data-act="courseDrop" data-i="' + i + '">' + ICON.x + '</button></div>';
+    });
+    if (issues && issues.length) {
+      h += '<div class="tiny" style="margin-top:9px;color:#B47708;line-height:1.6">⚠️ ' + issues.map(U.esc).join('；') + '</div>';
+    }
+    h += '<div class="btn-row"><button class="btn primary" data-act="courseSave">确认导入</button></div></div>';
+    box.innerHTML = h;
+  }
+
   function saveCourses() {
     if (!courseDraft || !courseDraft.length) { toast('先解析，再保存'); return; }
     const palette = ['#3B6CFF', '#8B5CF6', '#0EA5E9', '#F59E0B', '#10B981', '#EC4899', '#6366F1', '#14B8A6'];
-    // 覆盖同周次/同节次的旧课
-    courseDraft.forEach((c, i) => {
+    courseDraft.forEach((c) => {
       S.courses.push({
         id: U.uid(), name: c.name, teacher: c.teacher || '', place: c.place || '',
-        day: c.day, periods: c.periods.length ? c.periods : [1], weeks: c.weeks || '1-16',
-        color: c.color || palette[S.courses.length % palette.length]
+        day: c.day, periods: (c.periods && c.periods.length) ? c.periods : [1],
+        weeks: c.weeks || '1-16',
+        start: c.start || '', end: c.end || '',
+        color: palette[S.courses.length % palette.length]
       });
     });
     Store.save();

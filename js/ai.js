@@ -55,10 +55,13 @@
         body: JSON.stringify(Object.assign({
           model: model,
           messages: messages,
-          temperature: opt.temperature != null ? opt.temperature : 0.35,
           max_tokens: opt.maxTokens || 2600,
           stream: false
-        }, opt.json ? { response_format: { type: 'json_object' } } : {}))
+        },
+          // deepseek-reasoner（R1）不接受 temperature / response_format
+          /reasoner/i.test(model) ? {} : { temperature: opt.temperature != null ? opt.temperature : 0.35 },
+          (opt.json && !/reasoner/i.test(model)) ? { response_format: { type: 'json_object' } } : {}
+        ))
       });
     } catch (e) {
       clearTimeout(timer);
@@ -136,14 +139,34 @@
     ].join('\n');
   };
 
+  /** 把用户设的节次时间排成一行行，喂给模型，免得它自己编上课时间 */
+  function periodTable() {
+    const ps = S.settings.periods || [];
+    return ps.map((p, i) => '  第' + (i + 1) + '节 ' + p[0] + '-' + p[1]).join('\n');
+  }
+
   const SYS_COURSE = function () {
+    const sem = S.settings.semesterStart || '（未设置）';
     return [
-      '你是课表解析器。用户会粘贴从教务系统复制的课表文本或截图 OCR 结果。',
+      '你是课表解析器，服务对象是中国大学生。用户会粘贴从教务系统复制的课表文本（可能是表格、竖排、带「星期一/周一/1-2节/1-16周/单双周/教室/教师」等各种写法），也可能是截图识别出来的文字。',
       nowLine(),
-      '只输出 JSON：{"courses":[{"name":"课程名","teacher":"","place":"","day":1,"periods":[1,2],"weeks":"1-16","color":""}],"reply":"一句小结"}',
-      'day：周一=1 … 周日=7；periods：第几节，数组，如 [1,2] 或 [3,4,5]；',
-      'weeks：周次字符串，支持 "1-16"、"1-16单"、"2-16双"、"1-8,10-16"；不确定就填 "1-16"。',
-      '同一门课在不同天/不同节次要拆成多条。没解析出来的部分不要编造。'
+      '学校：' + (S.settings.school || '未知') + '；学期第 1 周周一：' + sem,
+      '本校作息（务必按这张表把节次换算成具体钟点，不要自己编时间）：',
+      periodTable(),
+      '',
+      '只输出一个 JSON 对象，不要解释、不要 markdown：',
+      '{"courses":[{"name":"课程名","teacher":"","place":"","day":1,"periods":[1,2],"weeks":"1-16","start":"08:30","end":"10:05","raw":"原文片段"}],',
+      ' "issues":["没看懂的地方，一句话说明"],"reply":"一句中文小结"}',
+      '规则：',
+      '1. day：周一=1 … 周日=7。periods：节次数组，如 [1,2]、[3,4,5]。',
+      '2. start/end：用上面作息表按最小/最大节次取起止时间。',
+      '3. weeks：周次字符串，如 "1-16"、"1-16单"（单周）、"2-16双"（双周）、"1-8,10-16"。文中没写就填 "1-16"。',
+      '4. 一句话里出现多个上课时段（如「周一1-2节，周三3-4节」）必须拆成多条课程记录。',
+      '5. 同一门课不同周次段（如前 8 周、后 8 周）也要拆成多条。',
+      '6. 课程名要去掉节次、周次、教室、教师这些修饰，只留课程本身（如「高等数学A」）。',
+      '7. 看不清、拿不准的字段留空字符串，并把疑问写进 issues，绝对不要瞎猜编号或时间。',
+      '8. raw 放这门课对应的原始文本片段（≤40 字），方便用户核对。',
+      '9. 如果整段文本根本不像课表（比如是成绩单、通知），courses 返回空数组，在 issues 里说明。'
     ].join('\n');
   };
 
@@ -201,20 +224,41 @@
   }
 
   async function parseCourses(text) {
+    const think = !!S.settings.reasoning;
     const r = await raw([
       { role: 'system', content: SYS_COURSE() },
-      { role: 'user', content: String(text).slice(0, 6000) }
-    ], { json: true, temperature: 0.1 });
+      { role: 'user', content: '课表文本如下：' + String.fromCharCode(10) + String(text).slice(0, 9000) }
+    ], {
+      json: !think,
+      temperature: 0.1,
+      model: think ? 'deepseek-reasoner' : (S.settings.model || 'deepseek-chat'),
+      maxTokens: think ? 5000 : 3200
+    });
     const j = pickJSON(r.text) || {};
-    return (j.courses || []).map((c) => ({
-      name: String(c.name || '').trim(),
-      teacher: c.teacher || '',
-      place: c.place || '',
-      day: U.clamp(parseInt(c.day, 10) || 1, 1, 7),
-      periods: (Array.isArray(c.periods) ? c.periods : [c.periods]).map((n) => parseInt(n, 10)).filter((n) => n >= 1 && n <= 20),
-      weeks: c.weeks || '1-16',
-      color: c.color || ''
-    })).filter((c) => c.name);
+    const fixT = (t) => {
+      const m = String(t || '').match(/(\d{1,2})[:：](\d{2})/);
+      return m ? U.pad(U.clamp(+m[1], 0, 23)) + ':' + U.pad(U.clamp(+m[2], 0, 59)) : '';
+    };
+    const courses = (j.courses || []).map((c) => {
+      const ps = (Array.isArray(c.periods) ? c.periods : [c.periods])
+        .map((n) => parseInt(n, 10)).filter((n) => n >= 1 && n <= 20);
+      return {
+        name: String(c.name || '').trim().slice(0, 40),
+        teacher: String(c.teacher || '').trim().slice(0, 20),
+        place: String(c.place || '').trim().slice(0, 30),
+        day: U.clamp(parseInt(c.day, 10) || 1, 1, 7),
+        periods: ps,
+        weeks: String(c.weeks || '1-16').trim(),
+        start: fixT(c.start),
+        end: fixT(c.end),
+        raw: String(c.raw || '').trim().slice(0, 40)
+      };
+    }).filter((c) => c.name);
+    return {
+      courses,
+      issues: Array.isArray(j.issues) ? j.issues.slice(0, 8).map((x) => String(x).slice(0, 80)) : [],
+      reply: String(j.reply || '').trim().slice(0, 80)
+    };
   }
 
   async function brief(ctxText) {

@@ -13,8 +13,8 @@
 <script>
   const q = new URLSearchParams(location.search);
   const theme = q.get('theme') || '';
-  const pages = ['today', 'calendar', 'ai', 'links', 'me'];
-  const names = { today: '今天', calendar: '日历', ai: 'AI', links: '入口', me: '我的' };
+  const pages = ['today', 'calendar', 'ai', 'links', 'me', 'maint'];
+  const names = { today: '今天', calendar: '日历', ai: 'AI', links: '入口', me: '我的', maint: '维护' };
   document.getElementById('row').innerHTML = pages.map(p =>
     `<figure><iframe src="../index.html?${theme ? 'theme=' + theme : ''}#${p}"></iframe><figcaption>${names[p]}</figcaption></figure>`
   ).join('');
