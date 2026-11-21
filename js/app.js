@@ -407,7 +407,7 @@
       '<p class="sub">' + y + ' 年 · ' + (weeksLeftText() || ('今天 ' + (new Date().getMonth() + 1) + '/' + new Date().getDate())) + '</p></div>' +
       '<div class="head-side"><button class="icon-btn" data-act="calToday">' + ICON.sun + '</button></div></div>';
     h += '<div class="seg"><button data-act="calMode" data-m="month" class="on">日历</button><button data-act="calMode" data-m="week">课表</button></div>';
-    h += '<div class="card">';
+    h += '<div class="card cal-card">';
     h += '<div class="cal-top"><div class="mon">' + y + ' / ' + U.pad(m + 1) + '</div><div class="cal-nav">' +
       '<button data-act="calPrev">' + ICON.left + '</button><button data-act="calNext">' + ICON.right + '</button></div></div>';
     h += '<div class="cal-grid">' + ['一', '二', '三', '四', '五', '六', '日'].map((w) => '<div class="cal-wd">' + w + '</div>').join('');

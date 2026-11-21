@@ -974,5 +974,19 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
 
 /* AI 页：草稿内嵌进主卡 */
 .draft-wrap{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.draft-wrap .card{margin-bottom:10px;box-shadow:none;border:1px solid var(--line)}
+/* 草稿内嵌进主卡后按方案降 S 档：10/12、r13、左侧色条、无阴影 */
+.draft-wrap .card{
+  margin-bottom:8px;box-shadow:none;background:var(--card-2);
+  padding:10px 12px;border-radius:13px;
+  border:0;border-left:3px solid var(--accent);
+}
 .draft-wrap .card:last-child{margin-bottom:0}
+.draft-wrap .draft{padding:0;border:0;background:none;margin-bottom:8px}
+
+/* ---------- 入口页节奏（第三轮）---------- */
+.grid-links{gap:12px 8px}
+.card .grid-links{padding:2px 0}
+.lk{padding:2px 0 4px}
+
+/* ---------- 日历页：月历卡收到容器档 ---------- */
+.cal-card{padding:20px 18px}
