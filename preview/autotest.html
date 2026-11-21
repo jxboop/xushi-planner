@@ -20,7 +20,7 @@ f.onload = async () => {
   try {
     await sleep(700);
     check('页面渲染', w.document.querySelectorAll('#view .page').length === 1);
-    check('tabbar 6 项', w.document.querySelectorAll('#tabbar button').length === 6);
+    check('tabbar 5 项', w.document.querySelectorAll('#tabbar button').length === 5);
 
     /* 1. 五页切换 */
     for (const p of ['calendar', 'ai', 'links', 'me', 'maint', 'today']) {
@@ -108,7 +108,8 @@ f.onload = async () => {
     check('ICS 结构', ics.indexOf('BEGIN:VCALENDAR') >= 0 && ics.indexOf('BEGIN:VEVENT') >= 0 && ics.indexOf('END:VALARM') >= 0, (ics.match(/BEGIN:VEVENT/g) || []).length + ' 个事件');
 
     /* 11. 主题切换（在维护页） */
-    await click('[data-act="go"][data-page="maint"]', 240);
+    await click('[data-act="go"][data-page="me"]', 240);
+    await click('[data-act="go"][data-page="maint"]', 300);
     await click('[data-act="theme"][data-t="dark"]', 300);
     check('深色生效', d.documentElement.getAttribute('data-theme') === 'dark');
     await click('[data-act="theme"][data-t="light"]', 300);
@@ -152,11 +153,11 @@ f.onload = async () => {
 
     /* 15. DDL */
     await click('[data-act="go"][data-page="today"]', 240);
-    check('今天页有 DDL 卡', !!q('.ddl-row'), q('.ddl-row') ? q('.ddl-badge').textContent : '');
-    check('DDL 文案是 D-n / 已过期', /D-\d|过期|小时/.test((q('.ddl-badge') || {}).textContent || ''), (q('.ddl-badge') || {}).textContent);
-    await click('[data-act="ddlSheet"]', 260);
+    check('今天页有「要处理的」卡', !!q('.risk-row'), q('.risk-row') ? q('.risk-row .ddl-badge').textContent : '');
+    check('DDL 文案是 D-n / 已过期', /D-\d|过期|小时/.test((q('.risk-row .ddl-badge') || {}).textContent || ''), (q('.risk-row .ddl-badge') || {}).textContent);
+    await click('.risk-row[data-act="ddlSheet"]', 300);
     check('DDL 管理面板', !!q('[data-act="ddlAdd"]'));
-    await click('[data-act="ddlAdd"]', 260);
+    await click('[data-act="ddlAdd"]', 280);
     check('DDL 表单', !!q('#ddlForm'));
     const nd = w.S.ddls.length;
     if (q('#ddlForm')) {
@@ -254,9 +255,11 @@ f.onload = async () => {
       steps: [{ id: 'a', title: '查资料', date: w.U.addDays(w.U.today(), 1), done: true },
               { id: 'b', title: '写初稿', date: w.U.addDays(w.U.today(), 3), done: false }] });
     w.Store.save();
-    await click('[data-act="go"][data-page="today"]', 260);
+    await click('[data-act="go"][data-page="today"]', 280);
+    const dl2 = q('.risk-row[data-act="ddlSheet"]') || q('.risk-row');
+    if (dl2) { dl2.click(); await sleep(320); }
     check('DDL 阶段进度条', !!q('.step-bar'), q('.step-bar') ? '有' : '无');
-    const ddlTxt = (q('.ddl-main') || {}).textContent || '';
+    const ddlTxt = (q('#sheet.on') || {}).textContent || '';
     check('显示下一步阶段', ddlTxt.indexOf('写初稿') >= 0, ddlTxt.replace(/\s+/g, ' ').slice(0, 40));
 
     check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));

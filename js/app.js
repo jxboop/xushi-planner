@@ -112,6 +112,7 @@
     sel: U.today(),
     calBase: U.today(),
     calMode: 'month',
+    toolsOpen: false,
     viewWeek: '',
     ai: { imgs: [], last: null, busy: false, brief: '', briefBusy: false, reviewBusy: false }
   };
@@ -253,81 +254,89 @@
     const t = U.today();
     const items = Store.dayItems(t);
     const s = Store.stats();
-    const inbox = S.inbox.filter((m) => !m.done).slice(0, 2);
-    const loose = S.todos.filter((x) => !x.done && !x.date).slice(0, 4);
+    const inbox = S.inbox.filter((m) => !m.done);
+    const loose = S.todos.filter((x) => !x.done && !x.date);
     const overdue = S.todos.filter((x) => !x.done && x.date && x.date < t);
+    const ddls = Store.ddlsOpen();
     const d = new Date();
     const dateLine = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 ' + U.weekCN[d.getDay()] + (weeksLeftText() ? ' · ' + weeksLeftText() : '');
-    const nextText = s.next ? ('下一件 · ' + s.next.title + (s.next.start ? ' ' + U.untilText(t, s.next.start) : '')) : (items.length ? '今天的都排完了' : '今天还没有安排');
+    const nextText = s.next ? ('接下来 ' + s.next.title) : (items.length ? '都排完了' : '还没安排');
 
     let h = '<div class="page">';
-    h += '<div class="hero"><div class="hero-top"><div>' +
-      '<div class="hi">' + greet() + (S.settings.name ? '，' + U.esc(S.settings.name) : '') + '</div>' +
-      '<div class="day">' + (items.length ? (s.done + ' / ' + items.length + ' 已完成') : '空着的一天') + '</div>' +
-      '<div class="date">' + dateLine + '</div>' +
-      '</div><div class="weather">' + U.esc(nextText) + '</div></div>' +
-      '<div class="hero-stats">' +
-      '<div class="stat"><b>' + s.timed + '</b><span>定时日程</span></div>' +
-      '<div class="stat"><b>' + (S.todos.filter((x) => !x.done).length) + '</b><span>待办</span></div>' +
-      '<div class="stat"><b>' + (overdue.length || 0) + '</b><span>逾期</span></div>' +
-      '</div><div class="hero-bar"><i style="width:' + s.rate + '%"></i></div></div>';
 
+    /* ---- L0 状态条：一行问候 + 一行进度，不再是渐变大卡 ---- */
+    h += '<div class="statusbar">' +
+      '<div class="sb-main">' +
+      '<div class="sb-hi">' + greet() + (S.settings.name ? '，' + U.esc(S.settings.name) : '') + '</div>' +
+      '<div class="sb-date">' + dateLine + '</div>' +
+      '</div>' +
+      '<div class="sb-stat"><b>' + (items.length ? s.done + '/' + items.length : '—') + '</b><span>' + U.esc(nextText) + '</span></div>' +
+      '</div>';
 
+    /* ---- L2 输入行 ---- */
     h += '<form class="quick" data-act="quick">' +
       '<button type="button" class="q-search" data-act="openSearch" aria-label="搜索">' + ICON.search + '</button>' +
       '<input id="quickInput" placeholder="说一句，或者点左边搜一下" autocomplete="off">' +
       '<button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
 
-    h += ddlCardHTML();
-
-    if (inbox.length) {
-      h += '<div class="sec-title">重要消息 <button class="link" data-act="inboxAdd">记一条</button></div>';
-      inbox.forEach((m) => {
-        h += '<div class="card tight" data-act="inboxOpen" data-id="' + m.id + '" style="border-left:3px solid ' + (m.level === 'high' ? 'var(--danger)' : 'var(--accent)') + '">' +
-          '<div style="font-size:13.5px;line-height:1.5">' + U.esc(m.text).slice(0, 160) + '</div>' +
-          '<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="chip ' + (m.level === 'high' ? 'warn' : 'gray') + '">' + (m.level === 'high' ? '要处理' : U.esc(m.from || '消息')) + '</span>' +
-          '<span class="tiny muted">' + U.relLabel(U.ymd(new Date(m.ts))) + '</span></div></div>';
-      });
-    }
-
-    h += '<div class="sec-title">今天的安排 <button class="link" data-act="newEvent" data-day="' + t + '">+ 新建</button></div>';
+    /* ---- L1 今天的安排：首屏主角 ---- */
+    h += '<div class="sec-title l1">今天的安排 <button class="link" data-act="newEvent" data-day="' + t + '">+ 新建</button></div>';
     if (items.length) {
-      h += '<div class="timeline">' + items.map(function (x, i) { return itemHTML(x, i, items[i - 1]); }).join('') + '</div>';
+      h += '<div class="card l1-card"><div class="timeline">' +
+        items.map(function (x, i) { return itemHTML(x, i, items[i - 1]); }).join('') + '</div></div>';
     } else {
-      h += '<div class="card empty"><span class="big">' + ICON.sun + '</span>还没有安排。<br>上面输入一句话，AI 会自己拆好。</div>';
+      h += '<div class="card l1-card empty"><span class="big">' + ICON.sun + '</span>还没有安排。<br>上面输入一句话，AI 会自己拆好。</div>';
     }
 
-    h += focusCardHTML();
-
-    if (overdue.length) {
-      h += '<div class="sec-title">逾期 <span class="tiny" style="color:var(--danger)">' + overdue.length + ' 条</span></div>';
-      overdue.slice(0, 5).forEach((td) => {
-        h += '<div class="card tight" style="display:flex;gap:10px;align-items:center">' +
-          '<button class="check" data-act="toggle" data-kind="todo" data-id="' + td.id + '">' + ICON.check + '</button>' +
-          '<div style="flex:1;min-width:0"><div style="font-size:14px">' + U.esc(td.title) + '</div>' +
-          '<div class="tiny" style="color:var(--danger)">' + U.relLabel(td.date) + '</div></div>' +
-          '<button class="tiny muted" data-act="openTodoDay" data-day="' + td.date + '">去看看</button></div>';
+    /* ---- L2 要处理的：DDL / 逾期 / 收集箱 / 消息，压成一卡 ---- */
+    const riskRows = [];
+    if (ddls.length) {
+      const d0 = ddls[0], lb = Store.ddlLabel(d0.dueMs);
+      riskRows.push({
+        act: 'ddlOpen', id: d0.id, badge: lb.text, level: lb.level,
+        txt: d0.title, more: ddls.length > 1 ? '还有 ' + (ddls.length - 1) + ' 个' : ''
       });
     }
-
+    if (overdue.length) {
+      riskRows.push({ act: 'goOverdue', badge: '逾期', level: 'past', txt: '有 ' + overdue.length + ' 条过了日子还没做', more: '' });
+    }
     if (loose.length) {
-      h += '<div class="sec-title">收集箱 <span class="tiny muted">没定日子的待办</span></div>';
-      h += '<div class="card">';
-      loose.forEach((td) => {
-        h += '<div style="display:flex;gap:10px;align-items:center;padding:6px 0">' +
-          '<button class="check" data-act="toggle" data-kind="todo" data-id="' + td.id + '">' + ICON.check + '</button>' +
-          '<span style="flex:1;font-size:14px">' + U.esc(td.title) + '</span>' +
-          '<button class="tiny" style="color:var(--accent-ink)" data-act="scheduleTodo" data-id="' + td.id + '">排期</button></div>';
+      riskRows.push({ act: 'goInbox', badge: '收集箱', level: 'normal', txt: loose.length + ' 条待办还没定日子', more: '去排期' });
+    }
+    if (inbox.length) {
+      riskRows.push({ act: 'goMsgs', badge: '消息', level: 'normal', txt: inbox.length + ' 条消息还没处理', more: '' });
+    }
+    if (riskRows.length) {
+      h += '<div class="sec-title">要处理的</div>';
+      h += '<div class="card m-card risk-card">';
+      if (ddls.length) {
+        riskRows.push({ act: 'ddlSheet', badge: '', level: 'normal', txt: '全部 DDL', more: ddls.length + ' 个' });
+      }
+      riskRows.slice(0, 4).forEach(function (r) {
+        h += '<div class="risk-row" data-act="' + r.act + '" data-id="' + (r.id || '') + '">' +
+          (r.badge ? '<span class="ddl-badge ' + r.level + '">' + U.esc(r.badge) + '</span>' : '<span style="width:6px"></span>') +
+          '<span class="risk-txt">' + U.esc(r.txt) + '</span>' +
+          (r.more ? '<span class="risk-more">' + U.esc(r.more) + ' ›</span>' : '<span class="risk-more">›</span>') +
+          '</div>';
       });
       h += '</div>';
     }
 
-    // 快捷入口预览
-    const links = S.links.slice(0, 8);
-    if (links.length) {
-      h += '<div class="sec-title">快捷入口 <button class="link" data-act="go" data-page="links">全部</button></div>';
-      h += '<div class="card">' + linkGrid(links) + '</div>';
+    /* ---- L3 工具：默认收起 ---- */
+    const todayMin = Store.focusToday();
+    h += '<div class="sec-title">工具 ' +
+      '<button class="link" data-act="toggleTools">' + (st.toolsOpen ? '收起 ⌃' : '专注 ' + todayMin + ' 分钟 · 展开 ⌄') + '</button></div>';
+    if (st.toolsOpen) {
+      h += '<div class="card m-card tools-card">';
+      h += focusCardHTML();
+      const links = S.links.slice(0, 4);
+      if (links.length) {
+        h += '<div class="tools-links">' + linkGrid(links).replace('grid-links', 'grid-links mini') + '</div>';
+        h += '<button class="btn block ghost" style="margin-top:10px;height:38px;font-size:13px" data-act="go" data-page="links">全部入口 ›</button>';
+      }
+      h += '</div>';
     }
+
     h += '</div>';
     return h;
   }
@@ -667,7 +676,10 @@
     });
     h += '</div>';
 
-    h += '<div class="card tiny muted center" style="line-height:1.7">数据只存在这台手机上 · API Key 也只在本地<br>备份、外观、安装包这些去「维护」页</div>';
+    h += '<div class="sec-title">系统</div><div class="list">' +
+      row('wrench', 'linear-gradient(135deg,#64748B,#94A3B8)', '维护', '备份 / 外观 / 安装包 / 日志', 'go') .replace('data-act="go"', 'data-act="go" data-page="maint"') +
+      '</div>';
+    h += '<div class="card tiny muted center" style="line-height:1.7">数据只存在这台手机上 · API Key 也只在本地</div>';
     h += '</div>';
     return h;
   }
@@ -750,8 +762,7 @@
     { k: 'calendar', t: '日历', i: 'cal' },
     { k: 'ai', t: 'AI', i: 'spark' },
     { k: 'links', t: '入口', i: 'grid' },
-    { k: 'me', t: '我的', i: 'user' },
-    { k: 'maint', t: '维护', i: 'wrench' }
+    { k: 'me', t: '我的', i: 'user' }
   ];
 
   function renderTab() {
@@ -1169,10 +1180,17 @@
     list.forEach((d) => {
       const lb = Store.ddlLabel(Store.ddlDue(d));
       const dt = U.toDate(d.date);
+      const steps = d.steps || [];
+      const doneN = steps.filter(function (x) { return x.done; }).length;
+      const nextStep = steps.filter(function (x) { return !x.done; })[0];
       h += '<div class="row tap" data-act="ddlOpen" data-id="' + d.id + '">' +
         '<div class="ddl-badge ' + lb.level + '" style="min-width:54px">' + lb.text + '</div>' +
         '<div class="lbl" style="' + (d.done ? 'text-decoration:line-through;color:var(--text-3)' : '') + '">' + U.esc(d.title) +
-        '<small>' + (dt.getMonth() + 1) + ' 月 ' + dt.getDate() + ' 日' + (d.time ? ' ' + d.time : '') + (d.tag ? ' · ' + U.esc(d.tag) : '') + '</small></div>' +
+        '<small>' + (dt.getMonth() + 1) + ' 月 ' + dt.getDate() + ' 日' + (d.time ? ' ' + d.time : '') + (d.tag ? ' · ' + U.esc(d.tag) : '') +
+        (steps.length ? ' · 阶段 ' + doneN + '/' + steps.length + (nextStep ? '（下一步：' + U.esc(nextStep.title) + '）' : '') : '') +
+        '</small>' +
+        (steps.length ? '<div class="step-bar"><i style="width:' + Math.round(doneN / steps.length * 100) + '%"></i></div>' : '') +
+        '</div>' +
         '<button class="tiny" style="color:var(--text-3);padding:4px 2px" data-act="ddlDel" data-id="' + d.id + '">' + ICON.x + '</button></div>';
     });
     h += '</div>';
@@ -1508,6 +1526,31 @@
       case 'calToday': st.calBase = U.today(); st.sel = U.today(); render(); break;
       case 'calSelect': st.sel = day; render(); break;
       case 'openSearch': openSearch(); break;
+      case 'toggleTools': st.toolsOpen = !st.toolsOpen; render(true); break;
+      case 'goOverdue': {
+        const t0 = U.today();
+        st.sel = U.addDays(t0, -1); st.calBase = st.sel; st.calMode = 'month'; st.page = 'calendar';
+        render();
+        break;
+      }
+      case 'goInbox': {
+        openSheet('<h2>收集箱</h2><p class="sh-sub">没定日子的待办，给它们排个期</p>' +
+          '<div class="list">' + S.todos.filter(function (x) { return !x.done && !x.date; }).map(function (td) {
+            return '<div class="row"><div class="lbl">' + U.esc(td.title) + '</div>' +
+              '<button class="tiny" style="color:var(--accent-ink);padding:6px" data-act="scheduleTodo" data-id="' + td.id + '">排期</button></div>';
+          }).join('') + '</div>');
+        break;
+      }
+      case 'goMsgs': {
+        const first = S.inbox.filter(function (m) { return !m.done; })[0];
+        if (first) openItemForm ? null : null;
+        openSheet('<h2>重要消息</h2><p class="sh-sub">' + S.inbox.filter(function (m) { return !m.done; }).length + ' 条待处理</p>' +
+          S.inbox.filter(function (m) { return !m.done; }).slice(0, 8).map(function (m) {
+            return '<div class="card tight" data-act="inboxOpen" data-id="' + m.id + '" style="border-left:3px solid ' + (m.level === 'high' ? 'var(--danger)' : 'var(--accent)') + '">' +
+              '<div style="font-size:13.5px;line-height:1.5">' + U.esc(m.text).slice(0, 120) + '</div></div>';
+          }).join(''));
+        break;
+      }
       case 'viewImg': viewImage(el.getAttribute('data-src')); break;
       case 'viewKey':
         IDB.getURL(el.getAttribute('data-key')).then(function (u) { if (u) viewImage(u); }).catch(function () {});
