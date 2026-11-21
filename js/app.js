@@ -113,6 +113,7 @@
     calBase: U.today(),
     calMode: 'month',
     toolsOpen: false,
+    aiToolsOpen: false,
     viewWeek: '',
     ai: { imgs: [], last: null, busy: false, brief: '', briefBusy: false, reviewBusy: false }
   };
@@ -505,36 +506,21 @@
       '<p class="sub">' + (AI.ready() ? '已接入 ' + U.esc(S.settings.model || 'deepseek-chat') : '还没填 Key，先用本地解析顶着') + '</p></div>' +
       '<div class="head-side"><button class="icon-btn" data-act="openAI">' + ICON.gear + '</button></div></div>';
 
-    // 1. 说一句
-    h += '<div class="card">';
-    h += '<div class="ai-box"><textarea id="aiInput" placeholder="把脑子里的东西倒出来：\n· 周三晚上七点 组会，带电脑\n· 周五前交大学物理实验预习报告\n· 12 月 20 号 英语四级，记得报">' +
-      (st.ai.input || '') + '</textarea></div>';
+    /* ---- L1 主任务：说一句（草稿内嵌在本卡尾部）---- */
+    h += '<div class="card l1-card">';
+    h += '<div class="ai-box"><textarea id="aiInput" placeholder="把脑子里的东西倒出来：' + String.fromCharCode(10) +
+      '· 周三晚上七点 组会，带电脑' + String.fromCharCode(10) +
+      '· 周五前交大学物理实验预习报告' + String.fromCharCode(10) +
+      '· 12 月 20 号 英语四级，记得报">' + (st.ai.input || '') + '</textarea></div>';
     h += '<div class="ai-hint">' +
-      ['明天下午三点去图书馆还书', '下周一交高数作业', '这周五 18:30 社团例会 二教 203', '把这段话拆成待办：买台灯、寄快递、补交材料'].map((x) => '<button class="tag-btn" data-act="fillAI" data-text="' + U.esc(x) + '">' + U.esc(x) + '</button>').join('') +
-      '</div>';
-    h += '<div class="btn-row"><button class="btn primary" data-act="aiParse">' + ICON.spark + ' 整理成日程</button></div>';
+      ['明天下午三点去图书馆还书', '下周一交高数作业', '这周五 18:30 社团例会 二教 203'].map(function (x) {
+        return '<button class="tag-btn" data-act="fillAI" data-text="' + U.esc(x) + '">' + U.esc(x) + '</button>';
+      }).join('') + '</div>';
+    h += '<button class="btn primary block" style="margin-top:12px" data-act="aiParse">' + ICON.spark + ' 整理成日程</button>';
+    if (st.ai.last) h += '<div class="draft-wrap">' + draftHTML(st.ai.last) + '</div>';
     h += '</div>';
 
-    if (st.ai.last) h += draftHTML(st.ai.last);
-
-    // 2. 相册
-    h += '<div class="sec-title">相册 · 截图整理 <span class="tiny muted">课表 / 通知 / 作业截图</span></div>';
-    h += '<div class="card">';
-    h += '<div class="drop" data-act="pickImg"><span class="ic-big">' + ICON.img + '</span>从相册选截图，AI 读出内容并分类<br><span class="tiny">支持一次多张 · 只在本机压缩后发送</span></div>';
-    h += '<input id="imgInput" type="file" accept="image/*" multiple style="display:none">';
-    if (st.ai.imgs.length) {
-      h += '<div class="thumbs">' + st.ai.imgs.map((x, i) => '<div class="thumb"><img src="' + x + '"><b data-act="dropImg" data-i="' + i + '">×</b></div>').join('') + '</div>';
-      h += '<div class="field" style="margin-top:12px"><label>这次想让它做什么？（可空）</label>' +
-        '<textarea id="aiWant" placeholder="比如：只提取公式和定义 / 整理成期末复习提纲 / 把作业要求和截止时间挑出来" style="min-height:64px;font-size:14.5px">' + U.esc(st.ai.want || '') + '</textarea></div>';
-      h += '<div class="btn-row"><button class="btn primary" data-act="aiVision" data-mode="note">' + (st.ai.visionBusy ? '<span class="spin"></span>' : ICON.spark) + ' 整理成笔记</button></div>';
-      h += '<div class="btn-row" style="margin-top:8px"><button class="btn" data-act="aiVision" data-mode="plan">生成日程/待办</button><button class="btn ghost" data-act="clearImg">清空</button></div>';
-    } else {
-      h += '<div class="tiny muted" style="margin-top:10px;line-height:1.6">' +
-        (AI.visionReady() ? '当前视觉模型：' + U.esc(S.settings.visionModel || '') : '未配置视觉模型，可用「长按图片 → 提取文字 → 粘贴到上面的框」的方式变通') + '</div>';
-    }
-    h += '</div>';
-
-    // 3. 简报
+    /* ---- L2 今日简报 ---- */
     h += '<div class="sec-title">今日简报</div>';
     h += '<div class="card">';
     if (st.ai.brief) {
@@ -546,56 +532,46 @@
     }
     h += '</div>';
 
-    // 4. 一周复盘
+    /* ---- L2 一周复盘 ---- */
     h += '<div class="sec-title">一周复盘 <button class="link" data-act="reviewHistory">历史</button></div>';
     h += '<div class="card">';
     if (st.ai.reviewBusy) {
-      h += '<div class="sk sk-line" style="width:92%"></div><div class="sk sk-line" style="width:100%"></div><div class="sk sk-line" style="width:78%"></div><div class="sk sk-line" style="width:86%"></div>';
+      h += '<div class="sk sk-line" style="width:92%"></div><div class="sk sk-line" style="width:100%"></div><div class="sk sk-line" style="width:78%"></div>';
     } else if (S.reviews.length) {
       const r = S.reviews[0];
       h += '<div class="review-meta">' + U.esc(r.range || '') + ' · ' + U.relLabel(U.ymd(new Date(r.ts))) + '</div>';
       h += '<div class="review-text">' + U.esc(r.text) + '</div>';
       h += '<div class="btn-row"><button class="btn" data-act="aiReview">' + ICON.spark + ' 再复盘一次</button></div>';
     } else {
-      h += '<div class="muted tiny" style="line-height:1.6">让 AI 看这一周的完成情况、逾期、专注时长，写一段真正对着你说话的复盘——不是统计表，是有人盯着你的那种。</div>';
+      h += '<div class="muted tiny" style="line-height:1.6">让 AI 看这一周的完成情况、逾期、专注时长，写一段真正对着你说话的复盘。</div>';
       h += '<button class="btn primary block" style="margin-top:13px" data-act="aiReview">生成这周复盘</button>';
     }
     h += '</div>';
 
-    // 4.5 笔记
-    h += '<div class="sec-title">笔记 <button class="link" data-act="openNotes">全部 ' + S.notes.length + '</button></div>';
-    if (S.notes.length) {
-      h += '<div class="card tight" style="padding:6px 14px">';
-      S.notes.slice(0, 3).forEach(function (n) {
-        const d = new Date(n.createdAt);
-        h += '<div class="note-row" data-act="openNote" data-id="' + n.id + '">' +
-          '<div class="note-dot"></div>' +
-          '<div style="flex:1;min-width:0">' +
-          '<div class="note-title">' + U.esc(n.title) + '</div>' +
-          '<div class="note-meta">' + U.esc(n.course) + ' · ' + U.esc(n.kind) + ' · ' + (d.getMonth() + 1) + '/' + d.getDate() + '</div>' +
-          '</div></div>';
-      });
-      h += '</div>';
-    } else {
-      h += '<div class="card" style="padding:14px 16px"><div class="tiny muted" style="line-height:1.65">把课堂板书、课件、作业截图丢进上面的相册，选「整理成笔记」，它会读懂内容、写好提纲，并按课程分好类。</div></div>';
-    }
-
-    // 5. 课表
-    h += '<div class="sec-title">课表</div>';
-    h += '<div class="list"><div class="row tap" data-act="courseImport"><div class="ic" style="background:linear-gradient(135deg,#3B6CFF,#8B5CF6)">' + ICON.book + '</div>' +
-      '<div class="lbl">导入课程表<small>粘贴教务系统文本，AI 排成每周课表</small></div>' + ARW + '</div></div>';
-
-    if (S.courses.length) {
-      h += '<div class="sec-title">已导入 ' + S.courses.length + ' 门</div><div class="card tight">';
-      S.courses.slice(0, 12).forEach((c) => {
-        h += '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13.5px">' +
-          '<span class="chip purple">周' + '一二三四五六日'[c.day - 1] + '</span>' +
-          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + U.esc(c.name) + '</span>' +
-          '<span class="tiny muted">' + (c.periods || []).join(',') + ' 节</span>' +
-          '<button class="tiny" style="color:var(--danger)" data-act="courseDel" data-id="' + c.id + '">删除</button></div>';
-      });
+    /* ---- L3 折叠：相册 + 笔记 ---- */
+    h += '<div class="sec-title">更多 AI 工具 ' +
+      '<button class="link" data-act="toggleAITools">' + (st.aiToolsOpen ? '收起 ⌃' : '相册 ' + st.ai.imgs.length + ' · 笔记 ' + S.notes.length + ' · 展开 ⌄') + '</button></div>';
+    if (st.aiToolsOpen) {
+      h += '<div class="card tools-card">';
+      h += '<div class="drop" data-act="pickImg"><span class="ic-big">' + ICON.img + '</span>从相册选截图，AI 读出内容并分类<br><span class="tiny">支持一次多张 · 只在本机压缩后发送</span></div>';
+      h += '<input id="imgInput" type="file" accept="image/*" multiple style="display:none">';
+      if (st.ai.imgs.length) {
+        h += '<div class="thumbs">' + st.ai.imgs.map(function (x, i) {
+          return '<div class="thumb"><img src="' + x + '"><b data-act="dropImg" data-i="' + i + '">×</b></div>';
+        }).join('') + '</div>';
+        h += '<div class="field" style="margin-top:12px"><label>这次想让它做什么？（可空）</label>' +
+          '<textarea id="aiWant" placeholder="比如：只提取公式和定义 / 整理成期末复习提纲" style="min-height:64px;font-size:14.5px">' + U.esc(st.ai.want || '') + '</textarea></div>';
+        h += '<div class="btn-row"><button class="btn primary" data-act="aiVision" data-mode="note">' + (st.ai.visionBusy ? '<span class="spin"></span>' : ICON.spark) + ' 整理成笔记</button></div>';
+        h += '<div class="btn-row" style="margin-top:8px"><button class="btn" data-act="aiVision" data-mode="plan">生成日程/待办</button><button class="btn ghost" data-act="clearImg">清空</button></div>';
+      } else {
+        h += '<div class="tiny muted" style="margin-top:10px;line-height:1.6">' +
+          (AI.visionReady() ? '当前视觉模型：' + U.esc(S.settings.visionModel || '') : '未配置视觉模型，可用「长按图片 → 提取文字 → 粘贴到上面的框」变通') + '</div>';
+      }
+      h += '<div class="tools-links"><div class="row tap" data-act="openNotes"><div class="ic" style="background:linear-gradient(135deg,#0EA5E9,#22D3EE)">' + ICON.book + '</div>' +
+        '<div class="lbl">全部笔记<small>按课程和类型分类</small></div><div class="val">' + S.notes.length + ' ›</div></div></div>';
       h += '</div>';
     }
+
     h += '</div>';
     return h;
   }
@@ -652,7 +628,8 @@
 
     h += '<div class="sec-title">课程</div>';
     h += '<div class="list">';
-    h += row('book', 'linear-gradient(135deg,#8B5CF6,#EC4899)', '课程表', S.courses.length ? S.courses.length + ' 门' : '未导入', 'courseImport');
+    h += row('book', 'linear-gradient(135deg,#8B5CF6,#EC4899)', '导入课程表', 'AI 解析 / 直接导入', 'courseImport');
+    h += row('cal', 'linear-gradient(135deg,#0EA5E9,#22D3EE)', '已导入课程', S.courses.length ? S.courses.length + ' 门' : '还没有', 'goWeek');
     h += row('clock', 'linear-gradient(135deg,#F59E0B,#F97316)', '上课节次时间', '可自定义', 'editPeriods');
     h += '</div>';
 
@@ -1552,6 +1529,7 @@
       case 'calSelect': st.sel = day; render(); break;
       case 'openSearch': openSearch(); break;
       case 'toggleTools': st.toolsOpen = !st.toolsOpen; render(true); break;
+      case 'toggleAITools': st.aiToolsOpen = !st.aiToolsOpen; render(true); break;
       case 'goOverdue': {
         const t0 = U.today();
         st.sel = U.addDays(t0, -1); st.calBase = st.sel; st.calMode = 'month'; st.page = 'calendar';

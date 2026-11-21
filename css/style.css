@@ -948,3 +948,31 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
 .is-row:active{background:var(--accent-soft)}
 .is-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .is-meta{font-size:11px;color:var(--text-3);flex:0 0 auto;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ============================================================
+   分组节奏四值（WorkBuddy 第二轮）
+   section 上 24 / 下 10 / 行内 8 / 块间 12（.card 已有 margin-bottom:12）
+   ============================================================ */
+:root{
+  --gap-section:24px;
+  --gap-title:10px;
+  --gap-row:8px;
+  --gap-block:12px;
+}
+.sec-title{margin:var(--gap-section) 2px var(--gap-title)}
+.sec-title.l1{margin-top:var(--gap-section)}
+.tl-row{padding-top:var(--gap-row);padding-bottom:var(--gap-row)}
+.note-row{padding-top:var(--gap-row);padding-bottom:var(--gap-row)}
+
+/* 次级卡片归档：按「有没有自己的操作」判定 */
+/* .draft 有采用/忽略按钮 → M 档 */
+.draft{padding:16px 14px;border-radius:18px}
+/* .tt-day / .note-card / .gpa-hero>div 是列表项或纯展示 → S 档 */
+.tt-day{padding:10px 12px;border-radius:13px;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.note-card{padding:10px 12px;border-radius:13px}
+.gpa-hero > div{padding:10px 12px;border-radius:13px}
+
+/* AI 页：草稿内嵌进主卡 */
+.draft-wrap{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.draft-wrap .card{margin-bottom:10px;box-shadow:none;border:1px solid var(--line)}
+.draft-wrap .card:last-child{margin-bottom:0}
