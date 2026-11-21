@@ -659,12 +659,133 @@
     });
     h += '</div>';
 
+    const sugOpen = (S.suggestions || []).filter((x) => x.status === 'draft' || x.status === 'submitted').length;
+    h += '<div class="sec-title">反馈</div><div class="list">' +
+      row('flag', 'linear-gradient(135deg,#3B6CFF,#8B5CF6)', '建议与反馈', sugOpen ? sugOpen + ' 条进行中' : '帮序时变得更好用', 'go').replace('data-act="go"', 'data-act="go" data-page="suggest"') +
+      '</div>';
+
     h += '<div class="sec-title">系统</div><div class="list">' +
       row('wrench', 'linear-gradient(135deg,#64748B,#94A3B8)', '维护', '备份 / 外观 / 安装包 / 日志', 'go') .replace('data-act="go"', 'data-act="go" data-page="maint"') +
       '</div>';
     h += '<div class="card tiny muted center" style="line-height:1.7">数据只存在这台手机上 · API Key 也只在本地</div>';
     h += '</div>';
     return h;
+  }
+
+  /* ---------------- 建议与反馈 ----------------
+     纯本地：提交=内容冻结+可一键复制/导出，收到答复后手动回写状态。
+     流程：新增 → 修改（仅草稿）→ 提交 → 查看 → 状态反馈。
+  */
+  const SUG_STATUS = Store.SUGGEST_STATUS;
+  const SUG_CATS = Store.SUGGEST_CATS;
+
+  function sugBadge(st) {
+    const cls = st === 'draft' ? 'gray' : st === 'submitted' ? 'warn' : st === 'accepted' ? 'ok' : '';
+    return '<span class="chip ' + cls + '">' + U.esc(SUG_STATUS[st] || st) + '</span>';
+  }
+
+  function pageSuggest() {
+    const all = S.suggestions || [];
+    const f = st.sugFilter || 'all';
+    const counts = {
+      all: all.length,
+      draft: all.filter((x) => x.status === 'draft').length,
+      submitted: all.filter((x) => x.status === 'submitted').length,
+      done: all.filter((x) => x.status === 'accepted' || x.status === 'rejected').length
+    };
+    const list = f === 'all' ? all : f === 'done'
+      ? all.filter((x) => x.status === 'accepted' || x.status === 'rejected')
+      : all.filter((x) => x.status === f);
+
+    let h = '<div class="page">';
+    h += '<div class="head"><div><div class="kick">Feedback</div><h1>建议与反馈</h1>' +
+      '<p class="sub">帮我把序时改得更好用 · 只存在这台手机</p></div>' +
+      '<div class="head-side"><button class="icon-btn" data-act="sugNew" aria-label="新增建议">' + ICON.plus + '</button></div></div>';
+
+    h += '<div class="card sug-intro"><div class="sug-intro-ic">' + ICON.flag + '</div>' +
+      '<div><b>你的想法，序时能听见</b>' +
+      '<p>序时没有服务器，建议不会自动上传。写好点「提交」，再一键复制发给开发者；收到答复后回来标个状态就行。全程不上传任何数据。</p></div></div>';
+
+    h += '<div class="seg sug-seg">' + [['all', '全部'], ['draft', '草稿'], ['submitted', '已提交'], ['done', '已答复']].map(function (x) {
+      return '<button data-act="sugFilter" data-f="' + x[0] + '" class="' + (f === x[0] ? 'on' : '') + '">' + x[1] + ' <small>' + counts[x[0]] + '</small></button>';
+    }).join('') + '</div>';
+
+    if (!list.length) {
+      h += '<div class="card empty"><span class="big">' + ICON.flag + '</span>' +
+        (f === 'all' ? '还没有建议。<br>用上面的 + 写第一条。' : '这里还没有条目。') + '</div>';
+    } else {
+      h += '<div class="sug-list">';
+      list.forEach(function (s) {
+        h += '<div class="card sug-item" data-act="sugDetail" data-id="' + s.id + '">' +
+          '<div class="sug-item-top">' + sugBadge(s.status) + '<span class="chip gray">' + U.esc(s.cat || '其它') + '</span>' +
+          '<span class="sug-time">' + U.relLabel(U.ymd(new Date(s.createdAt))) + '</span></div>' +
+          '<div class="sug-item-title">' + U.esc(s.title || '（无标题）') + '</div>' +
+          '<div class="sug-item-body">' + U.esc(String(s.body || '').slice(0, 70)) + (String(s.body || '').length > 70 ? '…' : '') + '</div>' +
+          (s.status === 'draft' ? '<div class="sug-item-actions">' +
+            '<button class="btn ghost sm" data-act="sugEdit" data-id="' + s.id + '">修改</button>' +
+            '<button class="btn primary sm" data-act="sugSubmit" data-id="' + s.id + '">提交</button></div>' : '') +
+          '</div>';
+      });
+      h += '</div>';
+    }
+
+    h += '<div class="card tiny muted center" style="line-height:1.75">建议只存在本机 · 备份/恢复时会一起带走<br>状态由你自己回写，不会有人远程查看</div>';
+    h += '</div>';
+    return h;
+  }
+
+  /** 新增 / 修改（仅草稿） */
+  function sheetSuggestForm(id) {
+    const s = (id && S.suggestions.find((x) => x.id === id)) || null;
+    if (s && s.status !== 'draft') { toast('已提交的内容不能改'); return; }
+    const d = s || { title: '', cat: '界面与体验', body: '', scene: '' };
+    let h = '<h2>' + (s ? '修改建议' : '写一条建议') + '</h2>' +
+      '<p class="sh-sub">写得越具体，越容易改到位</p>';
+    h += '<form id="sugForm" data-id="' + (id || '') + '">';
+    h += '<div class="field"><label>分类</label><select name="cat">' + SUG_CATS.map(function (c) {
+      return '<option' + (d.cat === c ? ' selected' : '') + '>' + U.esc(c) + '</option>';
+    }).join('') + '</select></div>';
+    h += '<div class="field"><label>一句话标题</label><input name="title" maxlength="60" value="' + U.esc(d.title) + '" placeholder="比如：选课季想按教学楼筛课"></div>';
+    h += '<div class="field"><label>具体要求</label><textarea name="body" maxlength="2000" style="min-height:110px" placeholder="现在是什么样、你希望改成什么样、为什么">' + U.esc(d.body) + '</textarea>' +
+      '<div class="hint">标题至少 4 字，具体要求至少 10 字。最多 2000 字。</div></div>';
+    h += '<div class="field"><label>使用场景（可空）</label><input name="scene" maxlength="80" value="' + U.esc(d.scene || '') + '" placeholder="比如：每学期选课那一周"></div>';
+    h += '<div class="btn-row sticky-actions"><button class="btn primary" type="submit">' + (s ? '保存修改' : '存为草稿') + '</button></div>';
+    h += '<div class="hint" style="margin-top:10px;text-align:center">先存草稿，检查后再提交</div>';
+    h += '</form>';
+    openSheet(h);
+  }
+
+  /** 详情 + 状态反馈 + 复制/导出 */
+  function sheetSuggestDetail(id) {
+    const s = S.suggestions.find((x) => x.id === id);
+    if (!s) { toast('这条建议不在了'); return; }
+    let h = '<h2>' + U.esc(s.title || '建议详情') + '</h2>' +
+      '<p class="sh-sub">' + sugBadge(s.status) + ' ' + U.esc(s.cat || '其它') + ' · ' + U.relLabel(U.ymd(new Date(s.createdAt))) + '</p>';
+    h += '<div class="sug-detail-sec"><label>具体要求</label><div class="sug-detail-text">' + U.esc(s.body || '') + '</div></div>';
+    if (s.scene) h += '<div class="sug-detail-sec"><label>使用场景</label><div class="sug-detail-text">' + U.esc(s.scene) + '</div></div>';
+
+    h += '<div class="sug-tl">';
+    h += '<div class="sug-tl-row"><i></i><b>写下建议</b><span>' + U.relLabel(U.ymd(new Date(s.createdAt))) + '</span></div>';
+    if (s.submittedAt) h += '<div class="sug-tl-row"><i class="on"></i><b>已提交</b><span>' + U.relLabel(U.ymd(new Date(s.submittedAt))) + '</span></div>';
+    if (s.repliedAt) h += '<div class="sug-tl-row"><i class="on"></i><b>' + U.esc(SUG_STATUS[s.status] || '已答复') + '</b><span>' + U.relLabel(U.ymd(new Date(s.repliedAt))) + '</span></div>';
+    h += '</div>';
+
+    if (s.status === 'draft') {
+      h += '<div class="btn-row"><button class="btn ghost" data-act="sugEdit" data-id="' + s.id + '">修改</button>' +
+        '<button class="btn primary" data-act="sugSubmit" data-id="' + s.id + '">提交</button></div>';
+      h += '<button class="btn block ghost danger" style="margin-top:9px" data-act="sugDel" data-id="' + s.id + '">删除草稿</button>';
+    } else if (s.status === 'submitted') {
+      h += '<div class="sug-tip">内容已冻结。复制后发给开发者，收到答复再回来标记。</div>';
+      h += '<div class="btn-row"><button class="btn primary" data-act="sugCopy" data-id="' + s.id + '">复制建议</button>' +
+        '<button class="btn ghost" data-act="sugExport" data-id="' + s.id + '">导出 .txt</button></div>';
+      h += '<div class="sug-reply-form"><label>收到答复？回写状态</label><div class="field"><textarea id="sugReplyText" maxlength="500" style="min-height:60px" placeholder="开发者说了什么（可空）"></textarea></div>' +
+        '<div class="btn-row"><button class="btn ghost" data-act="sugReply" data-id="' + s.id + '" data-r="rejected">标未采纳</button>' +
+        '<button class="btn primary" data-act="sugReply" data-id="' + s.id + '" data-r="accepted">标已采纳</button></div></div>';
+    } else {
+      if (s.reply) h += '<div class="sug-tip ok">答复：' + U.esc(s.reply) + '</div>';
+      h += '<button class="btn block ghost" style="margin-top:10px" data-act="sugCopy" data-id="' + s.id + '">复制建议</button>';
+    }
+    openSheet(h);
   }
 
   /* ---------------- 维护 ---------------- */
@@ -739,7 +860,7 @@
   }
 
   /* ---------------- 渲染 ---------------- */
-  const PAGES = { today: pageToday, calendar: pageCalendar, ai: pageAI, links: pageLinks, me: pageMe, maint: pageMaint };
+  const PAGES = { today: pageToday, calendar: pageCalendar, ai: pageAI, links: pageLinks, me: pageMe, suggest: pageSuggest, maint: pageMaint };
   const TABS = [
     { k: 'today', t: '今天', i: 'sun' },
     { k: 'calendar', t: '日历', i: 'cal' },
@@ -1121,7 +1242,7 @@
     setTimeout(() => a.remove(), 500);
   }
 
-  const PAGE_ORDER = ['today', 'calendar', 'ai', 'links', 'me', 'maint'];
+  const PAGE_ORDER = ['today', 'calendar', 'ai', 'links', 'me', 'suggest', 'maint'];
 
   function go(page) {
     const from = PAGE_ORDER.indexOf(st.page), to = PAGE_ORDER.indexOf(page);
@@ -1493,6 +1614,47 @@
       case 'noop': e.stopPropagation(); break;
       case 'closeSheet': closeSheet(); break;
       case 'go': go(el.getAttribute('data-page')); break;
+
+      /* --- 建议与反馈 --- */
+      case 'sugNew': sheetSuggestForm(''); break;
+      case 'sugEdit': sheetSuggestForm(id); break;
+      case 'sugDetail': sheetSuggestDetail(id); break;
+      case 'sugFilter': st.sugFilter = el.getAttribute('data-f'); render(true); break;
+      case 'sugSubmit': {
+        const s = Store.submitSuggestion(id);
+        if (!s) { toast('提交失败：内容不完整或重复了'); break; }
+        closeSheet(); render(true);
+        sheetSuggestDetail(id); // 提交后立刻给出复制/导出入口（状态反馈闭环）
+        toast('已提交 · 复制发给开发者吧', 3200);
+        break;
+      }
+      case 'sugDel': {
+        if (Store.delSuggestion(id)) { closeSheet(); render(true); toast('草稿已删'); }
+        else toast('已提交的不能删，留档');
+        break;
+      }
+      case 'sugReply': {
+        const txtEl = document.getElementById('sugReplyText');
+        const r = Store.replySuggestion(id, el.getAttribute('data-r'), txtEl ? txtEl.value : '');
+        if (!r) { toast('回写失败'); break; }
+        closeSheet(); render(true); toast('已标记为' + SUG_STATUS[r.status]);
+        break;
+      }
+      case 'sugCopy': {
+        const s = S.suggestions.find((x) => x.id === id);
+        if (!s) break;
+        const txt = Store.suggestText(s);
+        U.copy(txt).then(function () { toast('已复制，粘贴发给开发者即可', 3000); })
+          .catch(function () { toast('复制失败，请用「导出 .txt」', 3600); });
+        break;
+      }
+      case 'sugExport': {
+        const s = S.suggestions.find((x) => x.id === id);
+        if (!s) break;
+        U.download('序时-建议-' + s.title.slice(0, 12).replace(/[\\/:*?"<>|]/g, '') + '.txt', Store.suggestText(s), 'text/plain');
+        toast('已导出');
+        break;
+      }
 
       case 'toggle': {
         el.classList.add('pop');
@@ -1939,6 +2101,22 @@
       case 'inboxForm': {
         S.inbox.unshift({ id: U.uid(), text: get('text'), from: get('from') || '随手记', level: 'normal', ts: Date.now(), done: false });
         Store.save(); closeSheet(); toast('已记下'); render(true);
+        break;
+      }
+      case 'sugForm': {
+        const sid = f.getAttribute('data-id');
+        const title = get('title'), body = get('body');
+        if (title.length < 4) { toast('标题至少写 4 个字'); return; }
+        if (body.length < 10) { toast('具体要求至少写 10 个字'); return; }
+        const patch = { title: title, cat: get('cat') || '其它', body: body, scene: get('scene') };
+        if (sid) {
+          if (!Store.updateSuggestion(sid, patch)) { toast('已提交的内容不能改'); return; }
+          toast('已保存修改');
+        } else {
+          Store.addSuggestion(patch);
+          toast('草稿已存 · 检查后点提交');
+        }
+        closeSheet(); render(true);
         break;
       }
       case 'nameForm': S.settings.name = get('name'); Store.save(); closeSheet(); render(true); break;

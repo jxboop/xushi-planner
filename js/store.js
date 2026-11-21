@@ -198,7 +198,8 @@
       focus: [],
       notes: [],
       chats: [],
-      journals: []
+      journals: [],
+      suggestions: []
     };
   }
 
@@ -231,7 +232,7 @@
     const base = seed();
     const s = Object.assign({}, base, data || {});
     s.settings = Object.assign({}, DEFAULT_SETTINGS, (data && data.settings) || {});
-    ['events', 'todos', 'courses', 'links', 'inbox', 'drafts', 'goals', 'ddls', 'grades', 'reviews', 'focus', 'notes', 'chats', 'journals'].forEach((k) => {
+    ['events', 'todos', 'courses', 'links', 'inbox', 'drafts', 'goals', 'ddls', 'grades', 'reviews', 'focus', 'notes', 'chats', 'journals', 'suggestions'].forEach((k) => {
       if (!Array.isArray(s[k])) s[k] = base[k] || [];
     });
     return s;
@@ -399,7 +400,93 @@
   }
 
   /* ---------------- 增删改 ---------------- */
+  /* ---------------- 建议：本地状态机 ----------------
+     序时是纯本地 PWA，没有服务器。建议不走网络提交：
+       draft    草稿，可改可删
+       submitted 已提交（已复制/导出给开发者，内容冻结）
+       accepted 已采纳 / rejected 未采纳（收到答复后手动回写）
+     这样既守住「数据不出机」的承诺，又给出完整的提交-反馈闭环。
+  */
+  const SUGGEST_STATUS = {
+    draft: '草稿', submitted: '已提交', accepted: '已采纳', rejected: '未采纳'
+  };
+  const SUGGEST_CATS = ['课表与课程', '作业与 DDL', '成绩与保研', 'AI 与录入', '界面与体验', '其它'];
+
+  /** 内容指纹：用于提交前查重（同一条不许重复提交） */
+  function suggestFp(o) {
+    const raw = String(o.title || '').trim() + '|' + String(o.body || '').trim();
+    let h = 0;
+    for (let i = 0; i < raw.length; i++) { h = ((h << 5) - h + raw.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(36);
+  }
+
   const Api = {
+    addSuggestion(o) {
+      const now = Date.now();
+      const s = Object.assign({
+        id: U.uid(), title: '', cat: '界面与体验', body: '', scene: '',
+        status: 'draft', createdAt: now, updatedAt: now,
+        submittedAt: 0, reply: '', repliedAt: 0
+      }, o || {});
+      s.fp = suggestFp(s);
+      S.suggestions.unshift(s);
+      save();
+      return s;
+    },
+    updateSuggestion(id, patch) {
+      const s = S.suggestions.find((x) => x.id === id);
+      if (!s || s.status !== 'draft') return null; // 提交后内容冻结，不可改
+      Object.assign(s, patch || {}, { updatedAt: Date.now() });
+      s.fp = suggestFp(s);
+      save();
+      return s;
+    },
+    /** 提交：draft -> submitted，内容冻结；返回 null 表示不可提交或重复 */
+    submitSuggestion(id) {
+      const s = S.suggestions.find((x) => x.id === id);
+      if (!s || s.status !== 'draft') return null;
+      if (!String(s.title || '').trim() || !String(s.body || '').trim()) return null;
+      const dup = S.suggestions.find((x) => x.id !== id && x.fp === s.fp && x.status !== 'draft');
+      if (dup) return null;
+      s.status = 'submitted';
+      s.submittedAt = Date.now();
+      s.updatedAt = s.submittedAt;
+      save();
+      return s;
+    },
+    /** 回写答复状态：仅 submitted 可转 accepted/rejected */
+    replySuggestion(id, status, reply) {
+      const s = S.suggestions.find((x) => x.id === id);
+      if (!s || s.status !== 'submitted' || (status !== 'accepted' && status !== 'rejected')) return null;
+      s.status = status;
+      s.reply = String(reply || '');
+      s.repliedAt = Date.now();
+      s.updatedAt = s.repliedAt;
+      save();
+      return s;
+    },
+    delSuggestion(id) {
+      const s = S.suggestions.find((x) => x.id === id);
+      if (!s || s.status !== 'draft') return false; // 已提交的不能删，留档
+      S.suggestions = S.suggestions.filter((x) => x.id !== id);
+      save();
+      return true;
+    },
+    suggestText(s) {
+      const cat = s.cat || '其它';
+      const lines = [
+        '【序时 · 建议／反馈】',
+        '分类：' + cat,
+        '标题：' + (s.title || ''),
+        '',
+        '详细描述：',
+        (s.body || ''),
+        ''
+      ];
+      if (s.scene) lines.push('使用场景：' + s.scene, '');
+      lines.push('—— 来自序时 · ' + U.today());
+      return lines.join('\n');
+    },
     addEvent(o) {
       const ev = Object.assign({ id: U.uid(), date: U.today(), start: '', end: '', title: '', note: '', tag: '', done: false, createdAt: Date.now() }, o);
       S.events.push(ev); save(); return ev;
@@ -734,6 +821,10 @@
     applyBuiltin, BUILTIN_COURSES, addNote, notesByCourse, coursesOn, coursesInWeek, courseLastWeek, eventsOn, todosOn, dayItems, hasItems, weekNo, weeksInclude, periodSpan,
     addEvent: Api.addEvent, addTodo: Api.addTodo, delItem: Api.delItem,
     toggleItem: Api.toggleItem, commit: Api.commit,
+    SUGGEST_STATUS, SUGGEST_CATS, suggestFp, suggestText: Api.suggestText,
+    addSuggestion: Api.addSuggestion, updateSuggestion: Api.updateSuggestion,
+    submitSuggestion: Api.submitSuggestion, replySuggestion: Api.replySuggestion,
+    delSuggestion: Api.delSuggestion,
     buildICS, compress, stats, parseTimetableLines,
     gpaPoint, gpa,
     ddlDue, ddlsOpen, ddlLabel,
@@ -744,6 +835,8 @@
       const d = j && j.data ? j.data : j;
       if (!d || !d.settings) throw new Error('文件格式不对');
       Object.keys(d).forEach((k) => { S[k] = d[k]; });
+      if (!Array.isArray(S.suggestions)) S.suggestions = []; // 兼容旧备份
+      S.suggestions.forEach((x) => { if (!x.fp) x.fp = suggestFp(x); });
       save();
     },
     resetAll() {

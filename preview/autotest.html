@@ -262,6 +262,34 @@ f.onload = async () => {
     const ddlTxt = (q('#sheet.on') || {}).textContent || '';
     check('显示下一步阶段', ddlTxt.indexOf('写初稿') >= 0, ddlTxt.replace(/\s+/g, ' ').slice(0, 40));
 
+    /* 22. 建议与反馈：新增→修改→提交→查看→状态反馈 */
+    await click('[data-act="go"][data-page="me"]', 240);
+    await click('[data-act="go"][data-page="suggest"]', 260);
+    check('建议页可进入', q('#view').getAttribute('data-page') === 'suggest');
+    check('建议页有新增入口', !!q('[data-act="sugNew"]'));
+    await click('[data-act="sugNew"]', 240);
+    check('建议表单弹出', !!q('#sugForm'));
+    const sugF = q('#sugForm');
+    if (sugF) {
+      sugF.querySelector('[name=title]').value = '选课季按教学楼筛课';
+      sugF.querySelector('[name=body]').value = '现在课表列表太长，选课那周想按教学楼快速筛选，希望能加个筛选。';
+      sugF.querySelector('[name=scene]').value = '每学期选课那一周';
+      sugF.querySelector('[name=cat]').value = '课表与课程';
+      sugF.querySelector('[type=submit]').click(); await sleep(260);
+    }
+    check('草稿写入', w.S.suggestions.length === 1 && w.S.suggestions[0].status === 'draft', w.S.suggestions.length);
+    check('列表显示草稿', !!q('.sug-item'));
+    await click('.sug-item [data-act="sugSubmit"]', 320);
+    check('提交后状态=已提交', w.S.suggestions[0].status === 'submitted', w.S.suggestions[0].status);
+    check('提交后给出复制入口', !!q('[data-act="sugCopy"]'));
+    const sugTxt = w.Store.suggestText(w.S.suggestions[0]);
+    check('导出文本含分类与场景', sugTxt.indexOf('课表与课程') >= 0 && sugTxt.indexOf('选课那一周') >= 0);
+    const rp = q('[data-act="sugReply"][data-r="accepted"]');
+    if (rp) { rp.click(); await sleep(260); }
+    check('回写已采纳', w.S.suggestions[0].status === 'accepted', w.S.suggestions[0].status);
+    await click('[data-act="go"][data-page="me"]', 200);
+    check('我的页有建议入口', !!q('[data-page="suggest"]'));
+
     check('运行期无 JS 错误', w.__errs.length === 0, w.__errs.join(' | '));
   } catch (e) {
     check('测试脚本异常', false, e.message + ' @ ' + (e.stack || '').split('\n')[1]);
