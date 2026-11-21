@@ -176,11 +176,12 @@
     return w > 0 ? '第 ' + w + ' 周' : '';
   }
 
-  function itemHTML(it, i) {
+  function itemHTML(it, i, prev) {
     const isCourse = it.kind === 'course';
+    const prevAllDay = prev && !prev.start;
     const timeCell = it.start
       ? '<b>' + it.start + '</b>' + (it.end ? U.esc(it.end) : '')
-      : '<b>·</b>全天';
+      : (prevAllDay ? '' : '<b>·</b>全天');
     const chips = [];
     if (isCourse) chips.push('<span class="chip purple">' + U.esc(it.periodText || '课程') + '</span>');
     if (it.place) chips.push('<span class="chip gray">' + U.esc(it.place) + '</span>');
@@ -271,9 +272,11 @@
       '<div class="stat"><b>' + (overdue.length || 0) + '</b><span>逾期</span></div>' +
       '</div><div class="hero-bar"><i style="width:' + s.rate + '%"></i></div></div>';
 
-    h += '<button class="searchbar" data-act="openSearch">' + ICON.search + '<span>搜日程、待办、课程、入口</span></button>';
 
-    h += '<form class="quick" data-act="quick"><input id="quickInput" placeholder="说一句：明天下午三点开会" autocomplete="off"><button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
+    h += '<form class="quick" data-act="quick">' +
+      '<button type="button" class="q-search" data-act="openSearch" aria-label="搜索">' + ICON.search + '</button>' +
+      '<input id="quickInput" placeholder="说一句，或者点左边搜一下" autocomplete="off">' +
+      '<button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
 
     h += ddlCardHTML();
 
@@ -289,7 +292,7 @@
 
     h += '<div class="sec-title">今天的安排 <button class="link" data-act="newEvent" data-day="' + t + '">+ 新建</button></div>';
     if (items.length) {
-      h += '<div class="timeline">' + items.map(itemHTML).join('') + '</div>';
+      h += '<div class="timeline">' + items.map(function (x, i) { return itemHTML(x, i, items[i - 1]); }).join('') + '</div>';
     } else {
       h += '<div class="card empty"><span class="big">' + ICON.sun + '</span>还没有安排。<br>上面输入一句话，AI 会自己拆好。</div>';
     }
