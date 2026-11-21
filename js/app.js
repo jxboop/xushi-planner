@@ -278,6 +278,7 @@
       '<button type="button" class="q-search" data-act="openSearch" aria-label="搜索">' + ICON.search + '</button>' +
       '<input id="quickInput" placeholder="说一句，或者点左边搜一下" autocomplete="off">' +
       '<button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
+    h += '<div id="inlineSearch" class="inline-search"></div>';
 
     /* ---- L1 今天的安排：首屏主角 ---- */
     h += '<div class="sec-title l1">今天的安排 <button class="link" data-act="newEvent" data-day="' + t + '">+ 新建</button></div>';
@@ -999,6 +1000,30 @@
       if (x.type === '课程') { if (seen[key]) return false; seen[key] = 1; }
       return true;
     }).slice(0, 40);
+  }
+
+  /** 输入行里的「/ 前缀」内联搜索 */
+  function renderInlineSearch(kw) {
+    const box = document.getElementById('inlineSearch');
+    if (!box) return;
+    if (!String(kw || '').trim()) {
+      box.innerHTML = '<div class="is-tip">输入要搜的内容，回车打开第一条</div>';
+      box.classList.add('on');
+      return;
+    }
+    const list = searchAll(kw).slice(0, 5);
+    if (!list.length) {
+      box.innerHTML = '<div class="is-tip">没找到「' + U.esc(kw) + '」</div>';
+      box.classList.add('on');
+      return;
+    }
+    box.innerHTML = list.map(function (x) {
+      return '<div class="is-row" data-act="' + x.act + '" data-id="' + (x.id || '') + '" data-url="' + U.esc(x.url || '') + '" data-kind="' + (x.kind || '') + '">' +
+        '<span class="sr-type">' + x.type + '</span>' +
+        '<span class="is-title">' + U.esc(x.title) + '</span>' +
+        '<span class="is-meta">' + U.esc(x.meta.slice(0, 18)) + '</span></div>';
+    }).join('');
+    box.classList.add('on');
   }
 
   function renderSearch(kw) {
@@ -2302,12 +2327,30 @@
   document.addEventListener('input', function (e) {
     if (e.target && e.target.id === 'aiInput') st.ai.input = e.target.value;
     if (e.target && e.target.id === 'aiWant') st.ai.want = e.target.value;
+    if (e.target && e.target.id === 'quickInput') {
+      const v = e.target.value;
+      const box = document.getElementById('inlineSearch');
+      if (!box) return;
+      if (v.charAt(0) === '/') renderInlineSearch(v.slice(1));
+      else { box.innerHTML = ''; box.classList.remove('on'); }
+    }
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && e.target && e.target.id === 'quickInput') {
       e.preventDefault();
       const v = e.target.value.trim();
-      if (v) { e.target.value = ''; quickAdd(v); }
+      if (!v) return;
+      if (v.charAt(0) === '/') {
+        const box = document.getElementById('inlineSearch');
+        const first = box && box.querySelector('.is-row');
+        if (first) { first.click(); e.target.value = ''; if (box) { box.innerHTML = ''; box.classList.remove('on'); } }
+        else toast('没什么可打开的');
+        return;
+      }
+      e.target.value = '';
+      const box2 = document.getElementById('inlineSearch');
+      if (box2) { box2.innerHTML = ''; box2.classList.remove('on'); }
+      quickAdd(v);
     }
   });
   document.addEventListener('submit', function (e) {
