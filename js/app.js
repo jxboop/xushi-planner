@@ -277,7 +277,7 @@
     /* ---- L2 输入行 ---- */
     h += '<form class="quick" data-act="quick">' +
       '<button type="button" class="q-search" data-act="openSearch" aria-label="搜索">' + ICON.search + '</button>' +
-      '<input id="quickInput" placeholder="说一句，或者点左边搜一下" autocomplete="off">' +
+      '<input id="quickInput" placeholder="快记一笔：明天下午三点开会" autocomplete="off">' +
       '<button class="go" type="submit" aria-label="发送">' + ICON.up + '</button></form>';
     h += '<div id="inlineSearch" class="inline-search"></div>';
 
@@ -314,7 +314,12 @@
       if (ddls.length) {
         riskRows.push({ act: 'ddlSheet', badge: '', level: 'normal', txt: '全部 DDL', more: ddls.length + ' 个' });
       }
-      riskRows.slice(0, 4).forEach(function (r) {
+      const shown = riskRows.slice(0, 4);
+      if (riskRows.length > 4) {
+        const rest = riskRows.length - 4;
+        shown[3] = { act: 'ddlSheet', badge: '', level: 'normal', txt: '还有 ' + rest + ' 项要处理', more: '全部' };
+      }
+      shown.forEach(function (r) {
         h += '<div class="risk-row" data-act="' + r.act + '" data-id="' + (r.id || '') + '">' +
           (r.badge ? '<span class="ddl-badge ' + r.level + '">' + U.esc(r.badge) + '</span>' : '<span style="width:6px"></span>') +
           '<span class="risk-txt">' + U.esc(r.txt) + '</span>' +
@@ -503,7 +508,7 @@
   function pageAI() {
     let h = '<div class="page">';
     h += '<div class="head"><div><div class="kick">Assistant</div><h1>交给 AI</h1>' +
-      '<p class="sub">' + (AI.ready() ? '已接入 ' + U.esc(S.settings.model || 'deepseek-chat') : '还没填 Key，先用本地解析顶着') + '</p></div>' +
+      '<p class="sub">' + (AI.ready() ? '批量整理 · 已接入 ' + U.esc(S.settings.model || 'deepseek-chat') : '批量整理 · 还没填 Key，先用本地解析顶着') + '</p></div>' +
       '<div class="head-side"><button class="icon-btn" data-act="openAI">' + ICON.gear + '</button></div></div>';
 
     /* ---- L1 主任务：说一句（草稿内嵌在本卡尾部）---- */

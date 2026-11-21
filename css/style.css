@@ -632,6 +632,11 @@ html[data-theme="dark"] .seg button.on{background:#2A2D36}
   --shadow-card:0 1px 1.5px rgba(16,24,40,.05), 0 12px 32px -26px rgba(16,24,40,.55);
   --shadow-pop:0 24px 60px -18px rgba(16,24,40,.30);
   --glass:blur(30px) saturate(180%);
+  /* 分组节奏四值：唯一合法间距来源 */
+  --gap-section:24px;
+  --gap-title:10px;
+  --gap-row:8px;
+  --gap-block:12px;
 }
 
 html[data-theme="dark"]{
@@ -953,12 +958,6 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
    分组节奏四值（WorkBuddy 第二轮）
    section 上 24 / 下 10 / 行内 8 / 块间 12（.card 已有 margin-bottom:12）
    ============================================================ */
-:root{
-  --gap-section:24px;
-  --gap-title:10px;
-  --gap-row:8px;
-  --gap-block:12px;
-}
 .sec-title{margin:var(--gap-section) 2px var(--gap-title)}
 .sec-title.l1{margin-top:var(--gap-section)}
 .tl-row{padding-top:var(--gap-row);padding-bottom:var(--gap-row)}
@@ -990,3 +989,24 @@ html[data-theme="dark"] .ddl-main small{color:#8B93A1}
 
 /* ---------- 日历页：月历卡收到容器档 ---------- */
 .cal-card{padding:20px 18px}
+
+/* ============================================================
+   v1.14 P0/P1：桌面收口 + 无障碍焦点 + token 单一化
+   （依 WorkBuddy《完整页面设计与界面优化方案》§8）
+   ============================================================ */
+
+/* P0-1 宽屏内容不再拉满 */
+@media (min-width:600px){
+  .view{max-width:560px;margin-left:auto;margin-right:auto}
+  .tabbar{left:50%;right:auto;transform:translateX(-50%);width:536px}
+  .sheet{left:50%;right:auto;transform:translateX(-50%) translateY(101%);width:560px;border-radius:26px 26px 0 0}
+  .sheet.on{transform:translateX(-50%) translateY(0)}
+  .search-layer .search-head,.search-layer .search-body{max-width:560px;margin-left:auto;margin-right:auto}
+}
+
+/* P1-3 键盘焦点可见 */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+button:focus:not(:focus-visible){outline:none}
+
+/* P2-7 月历卡纳入容器档 */
+.cal-card{padding:var(--space-container,20px 18px)}
